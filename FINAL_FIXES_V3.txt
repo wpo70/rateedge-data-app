@@ -1,0 +1,100 @@
+================================================================================
+RATE EDGE V7.2 - FINAL FIXES V3
+ALL YOUR REQUESTED CHANGES
+================================================================================
+
+📥 DOWNLOAD:
+TABLE_VIEWS_V3_FINAL.zip
+
+================================================================================
+WHAT WAS FIXED:
+================================================================================
+
+1. BENCHMARK TAB:
+   ✅ O/N column moved to FIRST (after Date/Cur)
+   ✅ Spelling: "O/N" not "ON"
+   ✅ Currency filter works - select AUD, only AUD shows
+
+2. OIS TAB - COMPLETELY RESTRUCTURED:
+   ✅ Now has 3 sub-tabs inside the OIS Rates tab:
+      
+      📊 Short Term (0-2Y)
+         - Tenors: 1W, 2W, 3W, 1M, 2M, 3M, 6M, 9M, 1Y, 18M, 2Y
+         - Has "📊 Table View" button
+         - Currency filter works
+      
+      📊 Medium Term (3Y+)
+         - Tenors: 3Y, 4Y, 5Y, 7Y, 10Y, 12Y, 15Y, 20Y, 30Y
+         - Has "📊 Table View" button
+         - Currency filter works
+      
+      📊 Central Bank Meeting OIS
+         - Placeholder tab (blank for now)
+         - Ready for future implementation
+
+================================================================================
+INSTALLATION:
+================================================================================
+
+1. BACKUP:
+   Copy: RateEdge_v7.1\frontend\swap_rate_gui.py
+   To:   RateEdge_v7.1\frontend\swap_rate_gui_BACKUP.py
+
+2. REPLACE:
+   Copy: swap_rate_gui.py (from zip)
+   To:   RateEdge_v7.1\frontend\swap_rate_gui.py
+   
+3. DELETE CACHE:
+   Delete: RateEdge_v7.1\frontend\__pycache__\
+
+4. RUN:
+   Start RateEdge normally
+
+================================================================================
+WHAT YOU'LL SEE:
+================================================================================
+
+BENCHMARK TAB:
+Date        Cur  O/N     1M      2M      3M      4M      5M      6M
+2025-11-13  AUD  3.6000  3.5375  3.6095  3.6491  3.7100  3.8131  3.8790
+(Filter by AUD or NZD works)
+
+OIS TAB:
+- Click on "Short Term (0-2Y)" sub-tab
+  - Click "📊 Table View"
+  - See: Date | Cur | 1W | 2W | 3W | 1M | 2M | 3M | 6M | 9M | 1Y | 18M | 2Y
+
+- Click on "Medium Term (3Y+)" sub-tab
+  - Click "📊 Table View"
+  - See: Date | Cur | 3Y | 4Y | 5Y | 7Y | 10Y | 12Y | 15Y | 20Y | 30Y
+
+- Click on "Central Bank Meeting OIS" sub-tab
+  - Shows "Coming Soon"
+
+================================================================================
+ABOUT NZD DATA:
+================================================================================
+
+If you're not seeing NZD data, it's likely because:
+1. NZD data hasn't been imported yet
+2. The import script filtered it out
+3. Database doesn't have NZD rates
+
+TO FIX NZD DATA:
+- Run your BlueGamma import script again
+- Make sure NZD CSV files are in the BlueGamma folder
+- Check the import logs to see if NZD data was imported
+
+This is a DATA issue, not a GUI issue. The GUI will show NZD data as soon
+as it exists in the database.
+
+================================================================================
+NOTHING ELSE CHANGED:
+================================================================================
+
+✓ Your database - same
+✓ Your other tabs - same
+✓ All other functionality - same
+✓ Only Benchmark and OIS tabs updated
+
+================================================================================

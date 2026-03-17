@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 70" width="380" height="70">
+  <defs>
+    <linearGradient id="text-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+    <linearGradient id="curve-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Icon -->
+  <g transform="translate(10, 10)">
+    <path d="M 5 38 Q 18 34, 28 22 Q 38 12, 48 6" 
+          fill="none" 
+          stroke="url(#curve-grad)" 
+          stroke-width="3" 
+          stroke-linecap="round"/>
+    <circle cx="48" cy="6" r="4.5" fill="#dc2626"/>
+    <line x1="5" y1="48" x2="48" y2="48" stroke="#dc2626" stroke-width="2.5"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="85" y="45" 
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" 
+        font-size="36" 
+        font-weight="600" 
+        letter-spacing="0.5">
+    <tspan fill="url(#text-grad)">Rate</tspan><tspan fill="#dc2626">Edge</tspan>
+  </text>
+  
+  <!-- Australia tag -->
+  <text x="270" y="45" 
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" 
+        font-size="12" 
+        font-weight="400" 
+        fill="#64748b">
+    (Aust)
+  </text>
+</svg>

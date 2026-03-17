@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+{% block title %}Swap Rates - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.filter-card { background: white; border: 1px solid #bdc3c7; border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+.filter-section { border: 2px solid #2c3e50; border-radius: 8px; padding: 15px; }
+.quick-btn { margin: 2px; min-width: 90px; }
+.table-container { max-height: 500px; overflow: auto; border: 1px solid #bdc3c7; }
+.pivot-table { font-size: 0.8rem; }
+.pivot-table th { position: sticky; top: 0; background: #f39c12; color: white; text-align: center; padding: 5px 3px; z-index: 10; font-weight: bold; }
+.pivot-table th.date-col, .pivot-table th.curr-col { background: #2c3e50; }
+.pivot-table td { text-align: center; padding: 3px; font-family: 'Consolas', monospace; font-size: 0.75rem; }
+.pivot-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+.pivot-table tbody tr:hover { background-color: #e8f4f8; }
+.nav-tabs .nav-link { color: #2c3e50; font-weight: 500; font-size: 0.9rem; padding: 8px 12px; }
+.nav-tabs .nav-link.active { background-color: #2c3e50; color: white; }
+.sub-tabs .nav-link { font-size: 0.8rem; padding: 5px 10px; }
+.sub-tabs .nav-link.active { background-color: #34495e; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <!-- Main Filters -->
+    <div class="filter-card">
+        <div class="filter-section">
+            <h6 class="mb-2">📊 Filters & Quick Actions</h6>
+            <div class="row g-2 mb-2">
+                <div class="col-auto">
+                    <label class="form-label small mb-0">Currency:</label>
+                    <select class="form-select form-select-sm" id="currency" style="width: 80px;">
+                        <option value="AUD" selected>AUD</option>
+                        <option value="NZD">NZD</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="JPY">JPY</option>
+                        <option value="CAD">CAD</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-0">Tenor:</label>
+                    <select class="form-select form-select-sm" id="tenor" style="width: 70px;">
+                        <option value="All" selected>All</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-0">Floating:</label>
+                    <select class="form-select form-select-sm" id="floating_rate" style="width: 110px;">
+                        <option value="6M BBSW" selected>6M BBSW</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-0">From:</label>
+                    <input type="date" class="form-control form-control-sm" id="start_date" style="width: 120px;">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-0">To:</label>
+                    <input type="date" class="form-control form-control-sm" id="end_date" style="width: 120px;">
+                </div>
+                <div class="col-auto d-flex align-items-end">
+                    <button class="btn btn-primary btn-sm me-1" onclick="applyFilters()"><i class="fas fa-filter"></i> Apply Filters</button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-auto"><small>Quick Dates:</small></div>
+                <div class="col-auto">
+                    <button class="btn btn-outline-primary btn-sm quick-btn" onclick="setDateRange(30)">Last 30 Days</button>
+                    <button class="btn btn-outline-primary btn-sm quick-btn" onclick="setDateRange(90)">Last 90 Days</button>
+                    <button class="btn btn-outline-primary btn-sm quick-btn" onclick="setDateRange(365)">Last Year</button>
+                    <button class="btn btn-outline-primary btn-sm quick-btn" onclick="setDateRange(0)">All Time</button>
+                </div>
+                <div class="col-auto"><small class="text-muted">Date format: YYYY-MM-DD</small></div>
+            </div>
+            <div class="row g-1">
+                <div class="col-auto"><small>Tenor Range:</small></div>
+                <div class="col-auto">
+                    <button class="btn btn-outline-secondary btn-sm quick-btn" onclick="setTenorRange('short')">0-2Y (Short)</button>
+                    <button class="btn btn-outline-secondary btn-sm quick-btn" onclick="setTenorRange('long')">2Y+ (Long)</button>
+                    <button class="btn btn-outline-secondary btn-sm quick-btn" onclick="setTenorRange('all')">All Tenors</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Tabs - Like Desktop -->
+    <ul class="nav nav-tabs mb-0" id="mainTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#swapRatesTab" onclick="switchMainTab('swaps')">📈 Swap Rates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#benchmarkTab" onclick="switchMainTab('benchmark')">🏦 Central Bank & Benchmark Rates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#oisTab" onclick="switchMainTab('ois')">📊 OIS Rates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#swaptionTab" onclick="switchMainTab('swaption')">📉 Swaption Vol History</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#capFloorTab" onclick="switchMainTab('capfloor')">📊 Cap & Floor History</a>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- SWAP RATES TAB -->
+        <div class="tab-pane fade show active" id="swapRatesTab">
+            <div class="card border-top-0" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+                <div class="card-body p-0">
+                    <div class="d-flex justify-content-end p-2 border-bottom">
+                        <span id="swapRecordCount" class="badge bg-primary me-2">Loading...</span>
+                        <button class="btn btn-sm btn-outline-primary" onclick="toggleSwapView()" id="swapViewToggle">
+                            <i class="fas fa-th"></i> Table View
+                        </button>
+                    </div>
+                    <div id="swapLoading" class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+                    <div id="swapTableContainer" class="table-container" style="display: none;">
+                        <table class="table table-bordered pivot-table mb-0"><thead id="swapTableHead"></thead><tbody id="swapTableBody"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BENCHMARK TAB -->
+        <div class="tab-pane fade" id="benchmarkTab">
+            <div class="card border-top-0" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+                <div class="card-body p-0">
+                    <div class="d-flex justify-content-end p-2 border-bottom">
+                        <span id="bmRecordCount" class="badge bg-primary me-2">Loading...</span>
+                        <button class="btn btn-sm btn-outline-primary" onclick="toggleBMView()" id="bmViewToggle">
+                            <i class="fas fa-th"></i> Table View
+                        </button>
+                    </div>
+                    <div id="bmLoading" class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+                    <div id="bmTableContainer" class="table-container" style="display: none;">
+                        <table class="table table-bordered pivot-table mb-0"><thead id="bmTableHead"></thead><tbody id="bmTableBody"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OIS TAB -->
+        <div class="tab-pane fade" id="oisTab">
+            <!-- OIS Sub-tabs -->
+            <ul class="nav nav-tabs sub-tabs mb-0">
+                <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#oisShort" onclick="setOISTenorRange('short')">Short Term (0-2Y)</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#oisMedium" onclick="setOISTenorRange('medium')">Medium Term (3Y+)</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#oisCB" onclick="setOISTenorRange('cb')">Central Bank Meeting OIS</a></li>
+            </ul>
+            <div class="card border-top-0" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+                <div class="card-body p-0">
+                    <div class="d-flex justify-content-end p-2 border-bottom">
+                        <span id="oisRecordCount" class="badge bg-primary me-2">Loading...</span>
+                        <button class="btn btn-sm btn-outline-primary" onclick="toggleOISView()" id="oisViewToggle">
+                            <i class="fas fa-th"></i> Table View
+                        </button>
+                    </div>
+                    <div id="oisLoading" class="text-center py-4"><div class="spinner-border text-primary"></div></div>
+                    <div id="oisTableContainer" class="table-container" style="display: none;">
+                        <table class="table table-bordered pivot-table mb-0"><thead id="oisTableHead"></thead><tbody id="oisTableBody"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SWAPTION TAB -->
+        <div class="tab-pane fade" id="swaptionTab">
+            <div class="card border-top-0" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+                <div class="card-body text-center py-5 text-muted">
+                    <i class="fas fa-chart-line fa-3x mb-3"></i>
+                    <p>Swaption Volatility History - Coming Soon</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CAP & FLOOR TAB -->
+        <div class="tab-pane fade" id="capFloorTab">
+            <div class="card border-top-0" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+                <div class="card-body text-center py-5 text-muted">
+                    <i class="fas fa-chart-area fa-3x mb-3"></i>
+                    <p>Cap & Floor History - Coming Soon</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let currentTab = 'swaps';
+let swapData = [], bmData = [], oisData = [];
+let swapView = 'pivot', bmView = 'pivot', oisView = 'pivot';
+let tenorRangeFilter = null, oisTenorRange = 'short';
+
+const tenorColumns = ['3M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '30Y'];
+const shortOISTenors = ['1W', '2W', '3W', '1M', '2M', '3M', '6M', '9M', '1Y', '18M', '2Y'];
+const mediumOISTenors = ['3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y'];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFloatingRates('AUD');
+    setDateRange(0);
+    document.getElementById('currency').addEventListener('change', function() {
+        loadFloatingRates(this.value);
+    });
+});
+
+function loadFloatingRates(currency) {
+    const rates = {
+        'AUD': ['All', '1M BBSW', '2M BBSW', '3M BBSW', '4M BBSW', '5M BBSW', '6M BBSW', 'AONIA', 'BBSW', 'RBA'],
+        'NZD': ['All', '1M BKBM', '2M BKBM', '3M BKBM', '6M BKBM', 'BKBM', 'RBNZ', 'OCR'],
+        'USD': ['All', 'SOFR', 'EFFR'], 'EUR': ['All', 'ESTR', 'EURIBOR'],
+        'GBP': ['All', 'SONIA'], 'JPY': ['All', 'TONA'], 'CAD': ['All', 'CORRA']
+    };
+    const select = document.getElementById('floating_rate');
+    select.innerHTML = '';
+    (rates[currency] || ['All']).forEach((r, i) => {
+        const opt = document.createElement('option');
+        opt.value = r; opt.textContent = r;
+        if (r === '6M BBSW' || i === 1) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function setDateRange(days) {
+    const end = new Date();
+    document.getElementById('end_date').value = end.toISOString().split('T')[0];
+    document.getElementById('start_date').value = days === 0 ? '' : new Date(end - days * 86400000).toISOString().split('T')[0];
+    applyFilters();
+}
+
+function setTenorRange(range) {
+    tenorRangeFilter = range === 'short' ? {min: 0, max: 2} : range === 'long' ? {min: 2, max: 999} : null;
+    displaySwapData();
+}
+
+function setOISTenorRange(range) { oisTenorRange = range; displayOISData(); }
+
+function applyFilters() { loadSwapData(); loadBMData(); loadOISData(); }
+
+function clearFilters() {
+    document.getElementById('currency').value = 'AUD';
+    document.getElementById('tenor').value = 'All';
+    document.getElementById('start_date').value = '';
+    document.getElementById('end_date').value = '';
+    tenorRangeFilter = null;
+    loadFloatingRates('AUD');
+    applyFilters();
+}
+
+function switchMainTab(tab) { 
+    currentTab = tab; 
+    if (tab === 'ois') {
+        loadOISData();
+    }
+}
+
+// SWAP RATES
+function loadSwapData() {
+    const params = new URLSearchParams({
+        currency: document.getElementById('currency').value,
+        tenor: document.getElementById('tenor').value,
+        floating_rate: document.getElementById('floating_rate').value,
+        limit: 50000
+    });
+    const start = document.getElementById('start_date').value;
+    const end = document.getElementById('end_date').value;
+    if (start) params.append('start_date', start);
+    if (end) params.append('end_date', end);
+    
+    document.getElementById('swapLoading').style.display = 'block';
+    document.getElementById('swapTableContainer').style.display = 'none';
+    
+    fetch('/api/swap-rates?' + params).then(r => r.json()).then(data => {
+        swapData = data;
+        displaySwapData();
+        document.getElementById('swapLoading').style.display = 'none';
+    });
+}
+
+function displaySwapData() {
+    const grouped = {};
+    swapData.forEach(r => {
+        const key = `${r.date}|${r.currency}`;
+        if (!grouped[key]) grouped[key] = {date: r.date, currency: r.currency, rates: {}};
+        grouped[key].rates[r.tenor] = r.rate;
+    });
+    
+    let visibleTenors = tenorColumns;
+    if (tenorRangeFilter) {
+        const tenorYears = {'3M':0.25,'6M':0.5,'9M':0.75,'1Y':1,'2Y':2,'3Y':3,'4Y':4,'5Y':5,'6Y':6,'7Y':7,'8Y':8,'9Y':9,'10Y':10,'12Y':12,'15Y':15,'20Y':20,'30Y':30};
+        visibleTenors = tenorColumns.filter(t => tenorYears[t] >= tenorRangeFilter.min && tenorYears[t] <= tenorRangeFilter.max);
+    }
+    
+    let headerHtml = '<tr><th class="date-col">Date</th><th class="curr-col">Curr</th>';
+    visibleTenors.forEach(t => headerHtml += `<th>${t}</th>`);
+    headerHtml += '</tr>';
+    document.getElementById('swapTableHead').innerHTML = headerHtml;
+    
+    const rows = Object.values(grouped).sort((a, b) => b.date.substring(0,10).localeCompare(a.date.substring(0,10)));
+    let bodyHtml = '';
+    rows.forEach(r => {
+        bodyHtml += `<tr><td>${r.date.substring(0,10)}</td><td>${r.currency}</td>`;
+        visibleTenors.forEach(t => {
+            const rate = r.rates[t];
+            bodyHtml += rate !== undefined ? `<td>${rate.toFixed(4)}</td>` : '<td>-</td>';
+        });
+        bodyHtml += '</tr>';
+    });
+    
+    document.getElementById('swapTableBody').innerHTML = bodyHtml;
+    document.getElementById('swapRecordCount').textContent = `${rows.length} rows`;
+    document.getElementById('swapTableContainer').style.display = 'block';
+}
+
+function toggleSwapView() {
+    swapView = swapView === 'pivot' ? 'standard' : 'pivot';
+    displaySwapData();
+}
+
+// BENCHMARK
+function loadBMData() {
+    const params = new URLSearchParams({
+        currency: document.getElementById('currency').value,
+        rate_type: 'All',
+        limit: 50000
+    });
+    const start = document.getElementById('start_date').value;
+    const end = document.getElementById('end_date').value;
+    if (start) params.append('start_date', start);
+    if (end) params.append('end_date', end);
+    
+    document.getElementById('bmLoading').style.display = 'block';
+    document.getElementById('bmTableContainer').style.display = 'none';
+    
+    fetch('/api/benchmark-rates?' + params).then(r => r.json()).then(data => {
+        bmData = data;
+        displayBMData();
+        document.getElementById('bmLoading').style.display = 'none';
+    });
+}
+
+function displayBMData() {
+    // Get unique rate types and order them correctly
+    const rateTypesInData = [...new Set(bmData.map(r => r.rate_type))];
+    
+    // Sort order: AONIA FIX first, then RBA Cash Rate, then BBSW_1M, BBSW_2M etc
+    const sortOrder = (a, b) => {
+        const getPriority = (rt) => {
+            // AONIA comes first
+            if (rt === 'AONIA') return 0;
+            // RBA Cash Rate second
+            if (rt.includes('RBA') || rt.includes('Cash')) return 1;
+            // BBSW tenors next, sorted by number
+            if (rt.includes('BBSW')) {
+                const match = rt.match(/(\d+)/);
+                if (match) return 10 + parseInt(match[1]);
+            }
+            // Other tenors
+            const match = rt.match(/(\d+)/);
+            if (match) {
+                const num = parseInt(match[1]);
+                if (rt.includes('M')) return 50 + num;
+                if (rt.includes('Y')) return 100 + num;
+            }
+            return 150;
+        };
+        return getPriority(a) - getPriority(b);
+    };
+    
+    const rateTypes = rateTypesInData.sort(sortOrder);
+    
+    const grouped = {};
+    bmData.forEach(r => {
+        const key = `${r.date}|${r.currency}`;
+        if (!grouped[key]) grouped[key] = {date: r.date, currency: r.currency, rates: {}};
+        grouped[key].rates[r.rate_type] = r.rate;
+    });
+    
+    let headerHtml = '<tr><th class="date-col">Date</th><th class="curr-col">Curr</th>';
+    rateTypes.forEach(t => {
+        // Rename AONIA to AONIA FIX in display
+        const displayName = t === 'AONIA' ? 'AONIA FIX' : t;
+        headerHtml += `<th>${displayName}</th>`;
+    });
+    headerHtml += '</tr>';
+    document.getElementById('bmTableHead').innerHTML = headerHtml;
+    
+    const rows = Object.values(grouped).sort((a, b) => b.date.substring(0,10).localeCompare(a.date.substring(0,10)));
+    let bodyHtml = '';
+    rows.forEach(r => {
+        bodyHtml += `<tr><td>${r.date.substring(0,10)}</td><td>${r.currency}</td>`;
+        rateTypes.forEach(t => {
+            const rate = r.rates[t];
+            bodyHtml += rate !== undefined ? `<td>${rate.toFixed(4)}</td>` : '<td>-</td>';
+        });
+        bodyHtml += '</tr>';
+    });
+    
+    document.getElementById('bmTableBody').innerHTML = bodyHtml;
+    document.getElementById('bmRecordCount').textContent = `${rows.length} rows`;
+    document.getElementById('bmTableContainer').style.display = 'block';
+}
+
+function toggleBMView() { bmView = bmView === 'pivot' ? 'standard' : 'pivot'; displayBMData(); }
+
+// OIS
+function loadOISData() {
+    const params = new URLSearchParams({
+        currency: document.getElementById('currency').value,
+        rate_type: 'All',
+        limit: 50000
+    });
+    const start = document.getElementById('start_date').value;
+    const end = document.getElementById('end_date').value;
+    if (start) params.append('start_date', start);
+    if (end) params.append('end_date', end);
+    
+    document.getElementById('oisLoading').style.display = 'block';
+    document.getElementById('oisTableContainer').style.display = 'none';
+    
+    fetch('/api/ois-rates?' + params).then(r => r.json()).then(data => {
+        oisData = data;
+        console.log('OIS data received:', data.length, 'rows');
+        if (data.length > 0) {
+            console.log('Sample OIS rate_type:', data[0].rate_type);
+        }
+        displayOISData();
+        document.getElementById('oisLoading').style.display = 'none';
+    }).catch(e => {
+        console.error('OIS fetch error:', e);
+        document.getElementById('oisLoading').style.display = 'none';
+    });
+}
+
+function displayOISData() {
+    // Get all unique rate_types from the data
+    const allRateTypes = [...new Set(oisData.map(r => r.rate_type))].sort();
+    console.log('All OIS rate types:', allRateTypes);
+    
+    // Filter based on tenor range
+    let tenorsToShow;
+    if (oisTenorRange === 'short') {
+        // Short term: 1W, 2W, 3W, 1M, 2M, 3M, 6M, 9M, 1Y, 18M, 2Y
+        tenorsToShow = allRateTypes.filter(rt => {
+            const match = rt.match(/(\d+)(W|M|Y)/i);
+            if (!match) return false;
+            const num = parseInt(match[1]);
+            const unit = match[2].toUpperCase();
+            if (unit === 'W') return true;
+            if (unit === 'M' && num <= 18) return true;
+            if (unit === 'Y' && num <= 2) return true;
+            return false;
+        });
+    } else if (oisTenorRange === 'medium') {
+        // Medium term: 3Y+
+        tenorsToShow = allRateTypes.filter(rt => {
+            const match = rt.match(/(\d+)Y/i);
+            if (!match) return false;
+            return parseInt(match[1]) >= 3;
+        });
+    } else {
+        tenorsToShow = allRateTypes.slice(0, 10); // CB meetings placeholder
+    }
+    
+    // If no filtered tenors, show all
+    if (tenorsToShow.length === 0) {
+        tenorsToShow = allRateTypes;
+    }
+    
+    // Group data by date and currency
+    const grouped = {};
+    oisData.forEach(r => {
+        const key = `${r.date}|${r.currency}`;
+        if (!grouped[key]) grouped[key] = {date: r.date, currency: r.currency, rates: {}};
+        grouped[key].rates[r.rate_type] = r.rate;
+    });
+    
+    // Build header - show rate_type names directly
+    let headerHtml = '<tr><th class="date-col">Date</th><th class="curr-col">Cur</th>';
+    tenorsToShow.forEach(t => {
+        // Shorten the display name if needed
+        const displayName = t.replace('AONIA ', '').replace('AONIA_', '');
+        headerHtml += `<th>${displayName}</th>`;
+    });
+    headerHtml += '</tr>';
+    document.getElementById('oisTableHead').innerHTML = headerHtml;
+    
+    const rows = Object.values(grouped).sort((a, b) => b.date.substring(0,10).localeCompare(a.date.substring(0,10)));
+    let bodyHtml = '';
+    rows.forEach(r => {
+        bodyHtml += `<tr><td>${r.date.substring(0,10)}</td><td>${r.currency}</td>`;
+        tenorsToShow.forEach(t => {
+            const rate = r.rates[t];
+            bodyHtml += rate !== undefined ? `<td>${rate.toFixed(4)}</td>` : '<td>-</td>';
+        });
+        bodyHtml += '</tr>';
+    });
+    
+    document.getElementById('oisTableBody').innerHTML = bodyHtml;
+    document.getElementById('oisRecordCount').textContent = `${rows.length} rows`;
+    document.getElementById('oisTableContainer').style.display = 'block';
+}
+
+function toggleOISView() { oisView = oisView === 'pivot' ? 'standard' : 'pivot'; displayOISData(); }
+</script>
+{% endblock %}

@@ -1,0 +1,124 @@
+================================================================================
+RATEEDGE V11 - FIX RATE FORMAT ISSUE
+================================================================================
+
+PROBLEM:
+Your database has mixed formats:
+- Old data: DECIMAL (0.036 = 3.6%)
+- New data: PERCENTAGE (3.6000 = 3.6%)
+
+This causes calculators to show rates at 300-500 instead of 3-5.
+
+SOLUTION:
+1. Delete the wrong data (AONIA, BBSW, BKBM, RBA, RBNZ)
+2. Re-import with FIXED scripts that convert percentage → decimal automatically
+
+================================================================================
+STEP 1: DELETE WRONG DATA
+================================================================================
+
+1. Edit DELETE_WRONG_DATA.py
+   - Set DATABASE_PATH to your database location
+
+2. Run: python DELETE_WRONG_DATA.py
+
+3. Type 'DELETE' to confirm
+
+4. It will remove:
+   - All AONIA data
+   - All BBSW data
+   - All BKBM data
+   - All RBA data
+   - All RBNZ data
+
+================================================================================
+STEP 2: RE-IMPORT WITH FIXED SCRIPTS
+================================================================================
+
+The import scripts NOW include automatic conversion:
+```python
+df['Rate'] = df['Rate'].apply(lambda x: x / 100 if x > 1 else x)
+```
+
+This checks: if rate > 1, divide by 100 (convert percentage to decimal)
+
+1. Edit BOTH import scripts:
+   - import_ois_complete_v2.py
+   - import_benchmark_rates.py
+   - Set DATABASE_PATH to your database location
+
+2. Put your BlueGamma Excel files in BlueGamma folder
+
+3. Run: python import_ois_complete_v2.py
+   - Imports AONIA data
+   - Converts percentage to decimal automatically
+
+4. Run: python import_benchmark_rates.py
+   - Imports BBSW/BKBM/RBA/RBNZ data
+   - Converts percentage to decimal automatically
+
+================================================================================
+STEP 3: TEST
+================================================================================
+
+1. Start RateEdge
+
+2. Check Forward Swap Matrix
+   - Should show rates like 3.6316 (not 363.16)
+
+3. Check Swap Calculator
+   - Should show normal rates
+
+4. Check Benchmark tab
+   - Should show normal rates
+
+================================================================================
+ABOUT DAILY IMPORTS:
+================================================================================
+
+The import scripts use this for duplicates:
+```python
+UNIQUE(date, currency, tenor, floating_rate)
+```
+
+This means:
+✓ You can import daily data (e.g., just 1 day)
+✓ It will ADD new dates
+✓ It will SKIP existing dates (not overwrite)
+✓ Old data is KEPT
+✓ New data is ADDED
+
+Example:
+- Day 1: Import 100 days of data
+- Day 2: Import just today's data
+- Result: 101 days in database
+
+The scripts already support incremental/daily imports!
+
+================================================================================
+IMPORT SCRIPT BEHAVIOR:
+================================================================================
+
+When you import a file:
+- INSERT new records
+- SKIP duplicates (shows "X duplicates")
+- KEEP all existing data
+
+You can safely import:
+- Full historical files (1000+ days)
+- Daily updates (1 day)
+- Weekly updates (7 days)
+
+The database keeps everything and only adds what's new.
+
+================================================================================
+FILES IN THIS PACKAGE:
+================================================================================
+
+DELETE_WRONG_DATA.py - Delete incorrectly imported data
+import_ois_complete_v2.py - Fixed OIS importer with auto-conversion
+import_benchmark_rates.py - Fixed benchmark importer with auto-conversion
+
+================================================================================
+THIS FIXES THE RATE FORMAT ISSUE
+================================================================================

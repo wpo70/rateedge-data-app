@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Basis Analyzer - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.calculator-card { background: white; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.result-card { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }
+.result-value { font-size: 1.8rem; font-weight: bold; }
+.positive { color: #27ae60; }
+.negative { color: #e74c3c; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-3"><i class="fas fa-chart-bar"></i> Basis Analyzer</h2>
+    <p class="text-muted">3M vs 6M BBSW Floating Rate Basis Analysis</p>
+    
+    <div class="calculator-card">
+        <h5><i class="fas fa-calculator"></i> Spot Basis Calculator</h5>
+        <div class="row g-3 mb-3">
+            <div class="col-md-2">
+                <label class="form-label">Currency</label>
+                <select class="form-select" id="currency"><option value="AUD">AUD</option><option value="NZD">NZD</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Date</label>
+                <input type="date" class="form-control" id="date">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Tenor</label>
+                <select class="form-select" id="tenor">
+                    <option value="3Y">3Y</option><option value="4Y">4Y</option><option value="5Y" selected>5Y</option>
+                    <option value="6Y">6Y</option><option value="7Y">7Y</option><option value="10Y">10Y</option>
+                    <option value="12Y">12Y</option><option value="15Y">15Y</option><option value="20Y">20Y</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" onclick="calculateBasis()"><i class="fas fa-calculator"></i> Calculate</button>
+            </div>
+        </div>
+        <div class="row" id="spotResults" style="display: none;">
+            <div class="col-md-3"><div class="result-card"><small class="text-muted">3M BBSW Rate</small><div class="result-value" id="rate3m">-</div></div></div>
+            <div class="col-md-3"><div class="result-card"><small class="text-muted">6M BBSW Rate</small><div class="result-value" id="rate6m">-</div></div></div>
+            <div class="col-md-3"><div class="result-card"><small class="text-muted">Basis Spread</small><div class="result-value" id="basisSpread">-</div></div></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white"><i class="fas fa-chart-line"></i> Basis History</div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-2"><label class="form-label">Start Date</label><input type="date" class="form-control" id="chartStartDate"></div>
+                <div class="col-md-2"><label class="form-label">End Date</label><input type="date" class="form-control" id="chartEndDate"></div>
+                <div class="col-md-2 d-flex align-items-end"><button class="btn btn-success" onclick="loadBasisHistory()"><i class="fas fa-chart-line"></i> Load Chart</button></div>
+            </div>
+            <canvas id="basisChart" height="300"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let basisChart = null;
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').value = today;
+    document.getElementById('chartEndDate').value = today;
+    const start = new Date(); start.setMonth(start.getMonth() - 6);
+    document.getElementById('chartStartDate').value = start.toISOString().split('T')[0];
+});
+
+function calculateBasis() {
+    fetch('/api/calculate/basis', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            currency: document.getElementById('currency').value,
+            date: document.getElementById('date').value,
+            tenor: document.getElementById('tenor').value
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) { alert(result.error); return; }
+        document.getElementById('rate3m').textContent = result.rate_3m.toFixed(4) + '%';
+        document.getElementById('rate6m').textContent = result.rate_6m.toFixed(4) + '%';
+        const el = document.getElementById('basisSpread');
+        el.textContent = (result.basis_bp > 0 ? '+' : '') + result.basis_bp.toFixed(2) + ' bp';
+        el.className = 'result-value ' + (result.basis_bp > 0 ? 'positive' : 'negative');
+        document.getElementById('spotResults').style.display = 'flex';
+    }).catch(e => alert('Error: ' + e));
+}
+
+function loadBasisHistory() {
+    const params = new URLSearchParams({
+        currency: document.getElementById('currency').value,
+        tenor: document.getElementById('tenor').value,
+        start_date: document.getElementById('chartStartDate').value,
+        end_date: document.getElementById('chartEndDate').value
+    });
+    fetch('/api/basis-history?' + params)
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        if (basisChart) basisChart.destroy();
+        const ctx = document.getElementById('basisChart').getContext('2d');
+        basisChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.date),
+                datasets: [{
+                    label: 'Basis (3M - 6M) bp',
+                    data: data.map(d => d.basis),
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    fill: true, tension: 0.1
+                }]
+            },
+            options: { responsive: true, scales: { y: { title: { display: true, text: 'Basis Points' } } } }
+        });
+    }).catch(e => alert('Error: ' + e));
+}
+</script>
+{% endblock %}

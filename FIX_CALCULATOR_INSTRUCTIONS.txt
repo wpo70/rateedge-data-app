@@ -1,0 +1,136 @@
+================================================================================
+FIX FORWARD SWAP CALCULATOR - FINAL SOLUTION
+================================================================================
+
+PROBLEM:
+Forward Swap Calculator and other calculators show rates at 300-500 instead of 3-5.
+
+CAUSE:
+Your database has rates in PERCENTAGE format (3.6) instead of DECIMAL format (0.036).
+
+Even though import scripts NOW convert to decimal, you imported data BEFORE
+the fix was added, so bad data is still in the database.
+
+SOLUTION:
+Run FIX_ALL_RATES.py to convert ALL rates in database from percentage to decimal.
+
+================================================================================
+WHAT THIS SCRIPT DOES:
+================================================================================
+
+1. Checks database for rates > 1 (percentage format)
+2. Shows you examples of what will be fixed
+3. Asks for confirmation
+4. Updates ALL rates by dividing by 100
+5. Verifies the fix worked
+
+Example:
+- Before: rate = 3.6000 (percentage)
+- After:  rate = 0.0360 (decimal)
+
+================================================================================
+STEP-BY-STEP:
+================================================================================
+
+STEP 1: EDIT THE SCRIPT
+------------------------
+1. Open FIX_ALL_RATES.py in Notepad
+2. Find line 12: DATABASE_PATH = r'C:\Users\...'
+3. Change to YOUR database path
+4. Save the file
+
+STEP 2: BACKUP YOUR DATABASE (RECOMMENDED)
+-------------------------------------------
+1. Copy swap_rates.db to swap_rates_BACKUP.db
+2. If anything goes wrong, you can restore from backup
+
+STEP 3: RUN THE SCRIPT
+-----------------------
+1. Double-click FIX_ALL_RATES.py
+   OR
+2. Open command prompt:
+   cd C:\Users\willp\IRS_DATA_Manager\latest RateEdge 13112025\RateEdge_v7.1
+   python FIX_ALL_RATES.py
+
+STEP 4: FOLLOW PROMPTS
+----------------------
+1. Script shows how many rates need fixing
+2. Shows examples of what will change
+3. Type 'FIX' to proceed
+4. Script updates all rates
+5. Shows verification
+
+STEP 5: TEST
+------------
+1. Restart RateEdge
+2. Open Forward Swap Calculator
+3. Generate a matrix
+4. Rates should now be normal (3.6, not 363)
+
+================================================================================
+WHAT YOU'LL SEE:
+================================================================================
+
+BEFORE FIX:
+-----------
+Forward Swap Matrix shows:
+1BD    +2903.741
+1m     +2976.119
+etc.
+
+After Fix shows:
+1BD    +29.03741
+1m     +29.76119
+etc.
+
+AFTER FIX:
+----------
+Forward Swap Matrix shows:
+1BD    +29.03
+1m     +29.76
+etc.
+
+================================================================================
+THIS FIXES:
+================================================================================
+
+✓ Forward Swap Calculator
+✓ Forward Basis Matrix Generator
+✓ Swap Calculator
+✓ Any other tool that uses swap rates
+
+================================================================================
+WHY THIS HAPPENED:
+================================================================================
+
+RateEdge expects rates in DECIMAL format:
+- 3.6% interest rate = 0.036 in database
+
+BlueGamma exports rates in PERCENTAGE format:
+- 3.6% interest rate = 3.6000 in Excel file
+
+Import scripts NOW convert percentage to decimal automatically.
+
+But you imported data BEFORE this fix was added.
+
+So your database has mixed format:
+- Old data: decimal (0.036)
+- New data: percentage (3.6)
+
+Calculators add them: 0.036 + 3.6 = 3.636
+Then display as percentage: 3.636 × 100 = 363.6
+
+This script fixes ALL rates to decimal format.
+
+================================================================================
+AFTER RUNNING THIS SCRIPT:
+================================================================================
+
+- ALL rates will be in decimal format
+- Calculators will work correctly
+- Future imports will use decimal (scripts convert automatically)
+- You can import daily data without issues
+
+================================================================================
+THIS IS THE FINAL FIX FOR YOUR CALCULATORS
+================================================================================

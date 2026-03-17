@@ -1,0 +1,110 @@
+================================================================================
+GUI FIXES - VERSION 4
+================================================================================
+
+PROBLEMS FIXED:
+1. ✅ O/N column showing "AONIA" text instead of numbers
+2. ✅ Error: "no such table: benchmark_rates"
+
+================================================================================
+WHAT WAS WRONG:
+================================================================================
+
+ISSUE 1: O/N Column Showing "AONIA"
+------------------------------------
+The benchmark query was including AONIA rates:
+  WHERE floating_rate IN ('AONIA','OCR','RBA','RBNZ')
+                          ^^^^^^ WRONG!
+
+AONIA is an OIS rate (Overnight Index Swap), NOT a benchmark rate.
+When AONIA appeared in the O/N column, it showed the text "AONIA" 
+instead of a number because the floating_rate column value was being 
+displayed instead of the rate value.
+
+FIX: Removed AONIA from benchmark query
+  WHERE floating_rate IN ('RBA','RBNZ')
+
+ISSUE 2: "no such table: benchmark_rates"
+-----------------------------------------
+Line 1231 was querying a table called "benchmark_rates":
+  SELECT date, currency, rate FROM benchmark_rates
+
+This table doesn't exist. All rates are in "swap_rates" table.
+
+FIX: Changed to query swap_rates table:
+  SELECT date, currency, tenor, rate FROM swap_rates
+  WHERE floating_rate IN ('RBA', 'RBNZ')
+
+================================================================================
+WHAT BENCHMARKS SHOULD SHOW:
+================================================================================
+
+BENCHMARK TAB should display:
+- BBSW rates (AUD - Bank Bill Swap Rate)
+- BKBM rates (NZD - Bank Bill Benchmark Rate)  
+- RBA rates (AUD - Reserve Bank of Australia cash rate)
+- RBNZ rates (NZD - Reserve Bank of NZ official cash rate)
+
+For tenors: O/N, 1M, 2M, 3M, 4M, 5M, 6M
+
+BENCHMARK TAB should NOT display:
+- AONIA (this is OIS, not benchmark)
+- Any OIS rates
+
+================================================================================
+INSTALLATION:
+================================================================================
+
+1. Backup your current file:
+   RateEdge_v7.2_FINAL\frontend\swap_rate_gui.py → swap_rate_gui_BACKUP_V3.py
+
+2. Replace with new file:
+   Copy swap_rate_gui.py to RateEdge_v7.2_FINAL\frontend\swap_rate_gui.py
+
+3. Delete cache:
+   Delete RateEdge_v7.2_FINAL\frontend\__pycache__\
+
+4. Restart RateEdge
+
+================================================================================
+TESTING:
+================================================================================
+
+1. Go to Benchmark tab
+2. Click "📊 Table View" button
+3. You should see:
+   - Date | Cur | O/N | 1M | 2M | 3M | 4M | 5M | 6M
+   - All columns showing NUMBERS (not text)
+   - No "AONIA" text in O/N column
+   - No error messages
+
+4. If you have BBSW data:
+   - You'll see AUD rows with BBSW rates
+   
+5. If you have BKBM data:
+   - You'll see NZD rows with BKBM rates
+
+6. AONIA data should appear in:
+   OIS Rates tab → Short Term (0-2Y) → Table View
+   (NOT in Benchmark tab)
+
+================================================================================
+CHANGES IN THIS VERSION:
+================================================================================
+
+Line 3775: Removed AONIA from benchmark query
+  OLD: floating_rate IN ('AONIA','OCR','RBA','RBNZ')
+  NEW: floating_rate IN ('RBA','RBNZ')
+
+Line 1228-1234: Fixed benchmark rates query
+  OLD: SELECT date, currency, rate FROM benchmark_rates
+  NEW: SELECT date, currency, tenor, rate FROM swap_rates
+       WHERE floating_rate IN ('RBA', 'RBNZ')
+
+Line 1287-1294: Fixed benchmark_rows processing
+  OLD: for date, currency, rate in benchmark_rows: (3 columns)
+  NEW: for date, currency, tenor, rate in benchmark_rows: (4 columns)
+
+================================================================================
+FILE SIZE: 189 KB (4,113 lines)
+================================================================================

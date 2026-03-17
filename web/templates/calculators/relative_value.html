@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Relative Value - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.calculator-card { background: white; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.result-card { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }
+.result-value { font-size: 1.5rem; font-weight: bold; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-3"><i class="fas fa-balance-scale"></i> Relative Value Analyzer</h2>
+    <p class="text-muted">Analyze forward spreads vs curve spreads for steepening/flattening opportunities</p>
+    
+    <div class="calculator-card">
+        <h5><i class="fas fa-cog"></i> Analysis Parameters</h5>
+        <div class="row g-3 mb-3">
+            <div class="col-md-2">
+                <label class="form-label">Currency</label>
+                <select class="form-select" id="currency"><option value="AUD">AUD</option><option value="NZD">NZD</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Floating Rate</label>
+                <select class="form-select" id="floatingRate"><option value="AONIA">AONIA</option><option value="3M">3M BBSW</option><option value="6M">6M BBSW</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="startDate">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" id="endDate">
+            </div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Forward Spread 1 (e.g., 2y2y - 4y2y)</label>
+                <div class="input-group">
+                    <select class="form-select" id="fwd1Start"><option value="2">2Y</option><option value="3">3Y</option><option value="5">5Y</option></select>
+                    <select class="form-select" id="fwd1Tenor"><option value="2" selected>2Y</option><option value="3">3Y</option><option value="5">5Y</option></select>
+                </div>
+            </div>
+            <div class="col-md-1 d-flex align-items-end justify-content-center">
+                <span class="fw-bold">vs</span>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Forward Spread 2</label>
+                <div class="input-group">
+                    <select class="form-select" id="fwd2Start"><option value="2">2Y</option><option value="3">3Y</option><option value="4" selected>4Y</option><option value="5">5Y</option></select>
+                    <select class="form-select" id="fwd2Tenor"><option value="2" selected>2Y</option><option value="3">3Y</option><option value="5">5Y</option></select>
+                </div>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" onclick="analyzeRelativeValue()"><i class="fas fa-chart-line"></i> Analyze</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-chart-line"></i> Forward Spread History
+                </div>
+                <div class="card-body">
+                    <canvas id="rvChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-info-circle"></i> Current Values
+                </div>
+                <div class="card-body" id="currentValues">
+                    <p class="text-muted text-center">Click "Analyze" to calculate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let rvChart = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('endDate').value = today;
+    const start = new Date(); start.setMonth(start.getMonth() - 6);
+    document.getElementById('startDate').value = start.toISOString().split('T')[0];
+});
+
+async function analyzeRelativeValue() {
+    const currency = document.getElementById('currency').value;
+    const floatingRate = document.getElementById('floatingRate').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    const fwd1Start = parseInt(document.getElementById('fwd1Start').value);
+    const fwd1Tenor = parseInt(document.getElementById('fwd1Tenor').value);
+    const fwd2Start = parseInt(document.getElementById('fwd2Start').value);
+    const fwd2Tenor = parseInt(document.getElementById('fwd2Tenor').value);
+    
+    // Get available dates
+    const datesResp = await fetch('/api/available-dates?currency=' + currency);
+    const allDates = await datesResp.json();
+    
+    // Filter dates in range
+    const dates = allDates.filter(d => d >= startDate && d <= endDate).sort();
+    
+    const spread1Data = [];
+    const spread2Data = [];
+    const diffData = [];
+    
+    for (const date of dates) {
+        // Calculate forward rate 1
+        const resp1 = await fetch('/api/calculate/forward-rate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({date, currency, forward_start: fwd1Start, swap_tenor: fwd1Tenor, floating_rate: floatingRate})
+        });
+        const rate1 = await resp1.json();
+        
+        // Calculate forward rate 2
+        const resp2 = await fetch('/api/calculate/forward-rate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({date, currency, forward_start: fwd2Start, swap_tenor: fwd2Tenor, floating_rate: floatingRate})
+        });
+        const rate2 = await resp2.json();
+        
+        if (!rate1.error && !rate2.error) {
+            spread1Data.push({x: date, y: rate1.forward_rate});
+            spread2Data.push({x: date, y: rate2.forward_rate});
+            diffData.push({x: date, y: (rate1.forward_rate - rate2.forward_rate) * 100}); // in bp
+        }
+    }
+    
+    if (rvChart) rvChart.destroy();
+    const ctx = document.getElementById('rvChart').getContext('2d');
+    rvChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [
+                {
+                    label: `${fwd1Start}y${fwd1Tenor}y Rate`,
+                    data: spread1Data,
+                    borderColor: '#3498db',
+                    yAxisID: 'y',
+                    fill: false
+                },
+                {
+                    label: `${fwd2Start}y${fwd2Tenor}y Rate`,
+                    data: spread2Data,
+                    borderColor: '#e74c3c',
+                    yAxisID: 'y',
+                    fill: false
+                },
+                {
+                    label: 'Spread (bp)',
+                    data: diffData,
+                    borderColor: '#2ecc71',
+                    yAxisID: 'y1',
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: 'category', labels: dates },
+                y: { position: 'left', title: { display: true, text: 'Rate (%)' } },
+                y1: { position: 'right', title: { display: true, text: 'Spread (bp)' }, grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+    
+    // Update current values
+    if (spread1Data.length > 0) {
+        const latest1 = spread1Data[spread1Data.length - 1].y;
+        const latest2 = spread2Data[spread2Data.length - 1].y;
+        const latestDiff = diffData[diffData.length - 1].y;
+        
+        document.getElementById('currentValues').innerHTML = `
+            <div class="result-card mb-2">
+                <small class="text-muted">${fwd1Start}y${fwd1Tenor}y</small>
+                <div class="result-value">${latest1.toFixed(3)}%</div>
+            </div>
+            <div class="result-card mb-2">
+                <small class="text-muted">${fwd2Start}y${fwd2Tenor}y</small>
+                <div class="result-value">${latest2.toFixed(3)}%</div>
+            </div>
+            <div class="result-card">
+                <small class="text-muted">Spread</small>
+                <div class="result-value">${latestDiff.toFixed(1)} bp</div>
+            </div>
+        `;
+    }
+}
+</script>
+{% endblock %}

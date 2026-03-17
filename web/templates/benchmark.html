@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Benchmark Rates - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.filter-card { background: white; border: 1px solid #bdc3c7; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+.filter-section { border: 2px solid #2c3e50; border-radius: 8px; padding: 15px; }
+.table-container { max-height: 550px; overflow: auto; border: 1px solid #bdc3c7; }
+.pivot-table { font-size: 0.85rem; }
+.pivot-table th { position: sticky; top: 0; background: #f39c12; color: white; text-align: center; padding: 6px 4px; z-index: 10; font-weight: bold; }
+.pivot-table th.date-col, .pivot-table th.curr-col { background: #2c3e50; }
+.pivot-table td { text-align: center; padding: 4px; font-family: 'Consolas', monospace; }
+.pivot-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+.pivot-table tbody tr:hover { background-color: #e8f4f8; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <!-- Benchmark Filters -->
+    <div class="filter-card">
+        <div class="filter-section">
+            <h6 class="mb-3">🏦 Central Bank & Benchmark Rate Filters</h6>
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label small mb-1">Currency:</label>
+                    <select class="form-select form-select-sm" id="bm_currency" style="width: 80px;">
+                        <option value="AUD" selected>AUD</option>
+                        <option value="NZD">NZD</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="JPY">JPY</option>
+                        <option value="CAD">CAD</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">Rate Type:</label>
+                    <select class="form-select form-select-sm" id="bm_rate_type" style="width: 120px;">
+                        <option value="All" selected>All</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">From:</label>
+                    <input type="date" class="form-control form-control-sm" id="bm_start_date" style="width: 130px;">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">To:</label>
+                    <input type="date" class="form-control form-control-sm" id="bm_end_date" style="width: 130px;">
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary btn-sm" onclick="applyBMFilters()">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-secondary btn-sm" onclick="clearBMFilters()">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Card -->
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-university"></i> Benchmark Rates Data</span>
+            <div>
+                <span id="bm_recordCount" class="badge bg-light text-dark me-2">Loading...</span>
+                <button class="btn btn-sm btn-light" onclick="toggleBMView()" id="bmViewToggle">
+                    <i class="fas fa-th"></i> Table View
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div id="bm_loadingSpinner" class="text-center py-5">
+                <div class="spinner-border text-primary"></div>
+                <p class="mt-2">Loading benchmark data...</p>
+            </div>
+            
+            <div id="bm_tableContainer" class="table-container" style="display: none;">
+                <table class="table table-bordered pivot-table mb-0" id="bmDataTable">
+                    <thead id="bmTableHead"></thead>
+                    <tbody id="bmTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let bmCurrentView = 'pivot';
+let bmCurrentData = [];
+let bmRateTypes = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadBMRateTypes('AUD');
+    loadBMData();
+    
+    document.getElementById('bm_currency').addEventListener('change', function() {
+        loadBMRateTypes(this.value);
+    });
+});
+
+function loadBMRateTypes(currency) {
+    fetch('/api/benchmark-rate-types?currency=' + currency)
+        .then(r => r.json())
+        .then(types => {
+            bmRateTypes = types;
+            const select = document.getElementById('bm_rate_type');
+            select.innerHTML = '<option value="All">All</option>';
+            types.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                select.appendChild(opt);
+            });
+        })
+        .catch(e => console.error('Error loading rate types:', e));
+}
+
+function applyBMFilters() {
+    loadBMData();
+}
+
+function clearBMFilters() {
+    document.getElementById('bm_currency').value = 'AUD';
+    document.getElementById('bm_rate_type').value = 'All';
+    document.getElementById('bm_start_date').value = '';
+    document.getElementById('bm_end_date').value = '';
+    loadBMRateTypes('AUD');
+    loadBMData();
+}
+
+function loadBMData() {
+    const currency = document.getElementById('bm_currency').value;
+    const rate_type = document.getElementById('bm_rate_type').value;
+    const start_date = document.getElementById('bm_start_date').value;
+    const end_date = document.getElementById('bm_end_date').value;
+    
+    const params = new URLSearchParams({
+        currency: currency,
+        rate_type: rate_type,
+        limit: 50000
+    });
+    
+    if (start_date) params.append('start_date', start_date);
+    if (end_date) params.append('end_date', end_date);
+    
+    document.getElementById('bm_loadingSpinner').style.display = 'block';
+    document.getElementById('bm_tableContainer').style.display = 'none';
+    
+    fetch('/api/benchmark-rates?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            bmCurrentData = data;
+            displayBMData();
+            document.getElementById('bm_loadingSpinner').style.display = 'none';
+        })
+        .catch(e => {
+            console.error('Error:', e);
+            document.getElementById('bm_loadingSpinner').innerHTML = '<div class="alert alert-danger m-3">Error loading benchmark data</div>';
+        });
+}
+
+function displayBMData() {
+    if (bmCurrentView === 'pivot') {
+        displayBMPivotTable();
+    } else {
+        displayBMStandardTable();
+    }
+}
+
+function displayBMPivotTable() {
+    // Get unique rate types and order them correctly
+    const rateTypesInData = [...new Set(bmCurrentData.map(r => r.rate_type))];
+    
+    // Sort order: AONIA first, then RBA Cash Rate, then BBSW_1M, BBSW_2M etc
+    const sortOrder = (a, b) => {
+        const getPriority = (rt) => {
+            if (rt === 'AONIA') return 0;
+            if (rt.includes('RBA') || rt.includes('Cash')) return 1;
+            if (rt.includes('BBSW')) {
+                const match = rt.match(/(\d+)/);
+                if (match) return 10 + parseInt(match[1]);
+            }
+            const match = rt.match(/(\d+)/);
+            if (match) {
+                const num = parseInt(match[1]);
+                if (rt.includes('M')) return 50 + num;
+                if (rt.includes('Y')) return 100 + num;
+            }
+            return 150;
+        };
+        return getPriority(a) - getPriority(b);
+    };
+    
+    const rateTypesInDataSorted = rateTypesInData.sort(sortOrder);
+    
+    // Group data by date and currency
+    const grouped = {};
+    bmCurrentData.forEach(row => {
+        const key = `${row.date}|${row.currency}`;
+        if (!grouped[key]) {
+            grouped[key] = { date: row.date, currency: row.currency, rates: {} };
+        }
+        grouped[key].rates[row.rate_type] = row.rate;
+    });
+    
+    // Build header
+    let headerHtml = '<tr><th class="date-col">📅 Date</th><th class="curr-col">Cur</th>';
+    rateTypesInDataSorted.forEach(rt => {
+        const displayName = rt === 'AONIA' ? 'AONIA FIX' : rt;
+        headerHtml += `<th>${displayName}</th>`;
+    });
+    headerHtml += '</tr>';
+    document.getElementById('bmTableHead').innerHTML = headerHtml;
+    
+    // Sort by date descending
+    const rows = Object.values(grouped).sort((a, b) => {
+        const dateA = a.date.substring(0, 10);
+        const dateB = b.date.substring(0, 10);
+        return dateB.localeCompare(dateA);
+    });
+    
+    // Build body
+    let bodyHtml = '';
+    rows.forEach(row => {
+        const dateStr = row.date.substring(0, 10);
+        bodyHtml += `<tr><td>${dateStr}</td><td>${row.currency}</td>`;
+        rateTypesInDataSorted.forEach(rt => {
+            const rate = row.rates[rt];
+            if (rate !== undefined) {
+                bodyHtml += `<td>${rate.toFixed(4)}</td>`;
+            } else {
+                bodyHtml += '<td>-</td>';
+            }
+        });
+        bodyHtml += '</tr>';
+    });
+    
+    document.getElementById('bmTableBody').innerHTML = bodyHtml;
+    document.getElementById('bm_recordCount').textContent = `${rows.length} rows`;
+    document.getElementById('bm_tableContainer').style.display = 'block';
+}
+
+function displayBMStandardTable() {
+    // Standard flat view
+    document.getElementById('bmTableHead').innerHTML = '<tr><th>📅 Date</th><th>💱 Currency</th><th>📊 Rate Type</th><th>📈 Rate (%)</th></tr>';
+    
+    let bodyHtml = '';
+    bmCurrentData.forEach(row => {
+        const dateStr = row.date.substring(0, 10);
+        bodyHtml += `<tr>
+            <td>${dateStr}</td>
+            <td>${row.currency}</td>
+            <td>${row.rate_type}</td>
+            <td>${row.rate.toFixed(4)}</td>
+        </tr>`;
+    });
+    
+    document.getElementById('bmTableBody').innerHTML = bodyHtml;
+    document.getElementById('bm_recordCount').textContent = `${bmCurrentData.length} records`;
+    document.getElementById('bm_tableContainer').style.display = 'block';
+}
+
+function toggleBMView() {
+    if (bmCurrentView === 'pivot') {
+        bmCurrentView = 'standard';
+        document.getElementById('bmViewToggle').innerHTML = '<i class="fas fa-th"></i> Table View';
+    } else {
+        bmCurrentView = 'pivot';
+        document.getElementById('bmViewToggle').innerHTML = '<i class="fas fa-list"></i> Standard View';
+    }
+    displayBMData();
+}
+</script>
+{% endblock %}

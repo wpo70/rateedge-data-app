@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}OIS Rates - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.filter-card { background: white; border: 1px solid #bdc3c7; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+.filter-section { border: 2px solid #2c3e50; border-radius: 8px; padding: 15px; }
+.table-container { max-height: 550px; overflow: auto; border: 1px solid #bdc3c7; }
+.pivot-table { font-size: 0.85rem; }
+.pivot-table th { position: sticky; top: 0; background: #f39c12; color: white; text-align: center; padding: 6px 4px; z-index: 10; font-weight: bold; }
+.pivot-table th.date-col, .pivot-table th.curr-col { background: #2c3e50; }
+.pivot-table td { text-align: center; padding: 4px; font-family: 'Consolas', monospace; }
+.pivot-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+.pivot-table tbody tr:hover { background-color: #e8f4f8; }
+.nav-tabs .nav-link { color: #2c3e50; font-weight: 500; }
+.nav-tabs .nav-link.active { background-color: #2c3e50; color: white; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <!-- OIS Filters -->
+    <div class="filter-card">
+        <div class="filter-section">
+            <h6 class="mb-3">📊 OIS Rate Filters</h6>
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label small mb-1">Currency:</label>
+                    <select class="form-select form-select-sm" id="ois_currency" style="width: 80px;">
+                        <option value="AUD" selected>AUD</option>
+                        <option value="NZD">NZD</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="JPY">JPY</option>
+                        <option value="CAD">CAD</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">Rate Type:</label>
+                    <select class="form-select form-select-sm" id="ois_rate_type" style="width: 120px;">
+                        <option value="AONIA" selected>AONIA</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">From:</label>
+                    <input type="date" class="form-control form-control-sm" id="ois_start_date" style="width: 130px;">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">To:</label>
+                    <input type="date" class="form-control form-control-sm" id="ois_end_date" style="width: 130px;">
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary btn-sm" onclick="applyOISFilters()">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-secondary btn-sm" onclick="clearOISFilters()">Clear</button>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-success btn-sm" onclick="importOISData()">
+                        <i class="fas fa-file-import"></i> Import OIS Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sub-tabs like desktop -->
+    <ul class="nav nav-tabs mb-0" id="oisTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#shortTerm" onclick="setOISTenorRange('short')">Short Term (0-2Y)</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#mediumTerm" onclick="setOISTenorRange('medium')">Medium Term (3Y+)</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#centralBank" onclick="setOISTenorRange('cb')">Central Bank Meeting OIS</a>
+        </li>
+    </ul>
+
+    <!-- Data Card -->
+    <div class="card border-top-0" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+        <div class="card-body p-0">
+            <div class="d-flex justify-content-end p-2 border-bottom">
+                <span id="ois_recordCount" class="badge bg-primary me-2">Loading...</span>
+                <button class="btn btn-sm btn-outline-primary" onclick="toggleOISView()" id="oisViewToggle">
+                    <i class="fas fa-th"></i> Table View
+                </button>
+            </div>
+            
+            <div id="ois_loadingSpinner" class="text-center py-5">
+                <div class="spinner-border text-primary"></div>
+                <p class="mt-2">Loading OIS data...</p>
+            </div>
+            
+            <div id="ois_tableContainer" class="table-container" style="display: none;">
+                <table class="table table-bordered pivot-table mb-0" id="oisDataTable">
+                    <thead id="oisTableHead"></thead>
+                    <tbody id="oisTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let oisCurrentView = 'pivot';
+let oisCurrentData = [];
+let oisTenorRange = 'short';
+
+// Short term tenors (0-2Y)
+const shortTenors = ['1W', '2W', '3W', '1M', '2M', '3M', '6M', '9M', '1Y', '18M', '2Y'];
+// Medium term tenors (3Y+)
+const mediumTenors = ['3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y'];
+// Central bank meeting dates - placeholder
+const cbTenors = ['RBA_1', 'RBA_2', 'RBA_3', 'RBA_4', 'RBA_5', 'RBA_6'];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadOISRateTypes('AUD');
+    loadOISData();
+    
+    document.getElementById('ois_currency').addEventListener('change', function() {
+        loadOISRateTypes(this.value);
+    });
+});
+
+function loadOISRateTypes(currency) {
+    fetch('/api/ois-rate-types?currency=' + currency)
+        .then(r => r.json())
+        .then(types => {
+            const select = document.getElementById('ois_rate_type');
+            select.innerHTML = '';
+            if (types.length === 0) {
+                select.innerHTML = '<option value="AONIA">AONIA</option>';
+            } else {
+                types.forEach((t, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    if (i === 0) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            }
+        })
+        .catch(e => console.error('Error loading rate types:', e));
+}
+
+function setOISTenorRange(range) {
+    oisTenorRange = range;
+    displayOISData();
+}
+
+function applyOISFilters() {
+    loadOISData();
+}
+
+function clearOISFilters() {
+    document.getElementById('ois_currency').value = 'AUD';
+    document.getElementById('ois_start_date').value = '';
+    document.getElementById('ois_end_date').value = '';
+    loadOISRateTypes('AUD');
+    loadOISData();
+}
+
+function importOISData() {
+    window.location.href = '/import';
+}
+
+function loadOISData() {
+    const currency = document.getElementById('ois_currency').value;
+    const rate_type = document.getElementById('ois_rate_type').value;
+    const start_date = document.getElementById('ois_start_date').value;
+    const end_date = document.getElementById('ois_end_date').value;
+    
+    const params = new URLSearchParams({
+        currency: currency,
+        rate_type: rate_type,
+        limit: 50000
+    });
+    
+    if (start_date) params.append('start_date', start_date);
+    if (end_date) params.append('end_date', end_date);
+    
+    document.getElementById('ois_loadingSpinner').style.display = 'block';
+    document.getElementById('ois_tableContainer').style.display = 'none';
+    
+    fetch('/api/ois-rates?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            oisCurrentData = data;
+            displayOISData();
+            document.getElementById('ois_loadingSpinner').style.display = 'none';
+        })
+        .catch(e => {
+            console.error('Error:', e);
+            document.getElementById('ois_loadingSpinner').innerHTML = '<div class="alert alert-danger m-3">Error loading OIS data</div>';
+        });
+}
+
+function displayOISData() {
+    if (oisCurrentView === 'pivot') {
+        displayOISPivotTable();
+    } else {
+        displayOISStandardTable();
+    }
+}
+
+function displayOISPivotTable() {
+    // Determine which tenors to show based on tab
+    let tenorsToShow;
+    if (oisTenorRange === 'short') {
+        tenorsToShow = shortTenors;
+    } else if (oisTenorRange === 'medium') {
+        tenorsToShow = mediumTenors;
+    } else {
+        tenorsToShow = cbTenors;
+    }
+    
+    // Group data by date and currency
+    const grouped = {};
+    oisCurrentData.forEach(row => {
+        const key = `${row.date}|${row.currency}`;
+        if (!grouped[key]) {
+            grouped[key] = { date: row.date, currency: row.currency, rates: {} };
+        }
+        // Extract tenor from rate_type (e.g., "AONIA 1W" -> "1W")
+        const parts = row.rate_type.split(' ');
+        const tenor = parts.length > 1 ? parts[parts.length - 1] : row.rate_type;
+        grouped[key].rates[tenor] = row.rate;
+    });
+    
+    // Build header
+    let headerHtml = '<tr><th class="date-col">📅 Date</th><th class="curr-col">Cur</th>';
+    tenorsToShow.forEach(tenor => {
+        headerHtml += `<th>${tenor}</th>`;
+    });
+    headerHtml += '</tr>';
+    document.getElementById('oisTableHead').innerHTML = headerHtml;
+    
+    // Sort by date descending
+    const rows = Object.values(grouped).sort((a, b) => {
+        const dateA = a.date.substring(0, 10);
+        const dateB = b.date.substring(0, 10);
+        return dateB.localeCompare(dateA);
+    });
+    
+    // Build body
+    let bodyHtml = '';
+    rows.forEach(row => {
+        const dateStr = row.date.substring(0, 10);
+        bodyHtml += `<tr><td>${dateStr}</td><td>${row.currency}</td>`;
+        tenorsToShow.forEach(tenor => {
+            const rate = row.rates[tenor];
+            if (rate !== undefined) {
+                bodyHtml += `<td>${rate.toFixed(4)}</td>`;
+            } else {
+                bodyHtml += '<td>-</td>';
+            }
+        });
+        bodyHtml += '</tr>';
+    });
+    
+    document.getElementById('oisTableBody').innerHTML = bodyHtml;
+    document.getElementById('ois_recordCount').textContent = `${rows.length} rows`;
+    document.getElementById('ois_tableContainer').style.display = 'block';
+}
+
+function displayOISStandardTable() {
+    // Standard flat view
+    document.getElementById('oisTableHead').innerHTML = '<tr><th>📅 Date</th><th>💱 Currency</th><th>📊 Rate Type</th><th>📈 Rate (%)</th></tr>';
+    
+    let bodyHtml = '';
+    oisCurrentData.forEach(row => {
+        const dateStr = row.date.substring(0, 10);
+        bodyHtml += `<tr>
+            <td>${dateStr}</td>
+            <td>${row.currency}</td>
+            <td>${row.rate_type}</td>
+            <td>${row.rate.toFixed(4)}</td>
+        </tr>`;
+    });
+    
+    document.getElementById('oisTableBody').innerHTML = bodyHtml;
+    document.getElementById('ois_recordCount').textContent = `${oisCurrentData.length} records`;
+    document.getElementById('ois_tableContainer').style.display = 'block';
+}
+
+function toggleOISView() {
+    if (oisCurrentView === 'pivot') {
+        oisCurrentView = 'standard';
+        document.getElementById('oisViewToggle').innerHTML = '<i class="fas fa-th"></i> Table View';
+    } else {
+        oisCurrentView = 'pivot';
+        document.getElementById('oisViewToggle').innerHTML = '<i class="fas fa-list"></i> Standard View';
+    }
+    displayOISData();
+}
+</script>
+{% endblock %}

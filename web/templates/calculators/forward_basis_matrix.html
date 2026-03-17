@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Forward Basis Matrix - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.calculator-card { background: white; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.matrix-table { font-size: 0.85rem; }
+.matrix-table th { background: #bdc3c7; color: #2c3e50; text-align: center; padding: 8px; font-weight: bold; }
+.matrix-table th.fwd-col { background: #2c3e50; color: white; }
+.matrix-table td { text-align: center; padding: 6px; font-family: monospace; }
+.matrix-table tbody tr:nth-child(even) { background: #f8f9fa; }
+.positive { color: #27ae60; background: #d4edda !important; }
+.negative { color: #e74c3c; background: #f8d7da !important; }
+.btn-teal { background: #1abc9c; color: white; border: none; }
+.btn-teal:hover { background: #16a085; color: white; }
+.btn-coral { background: #e74c3c; color: white; border: none; }
+.btn-coral:hover { background: #c0392b; color: white; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="text-center mb-4">
+        <h2><i class="fas fa-th"></i> Forward Basis Matrix Generator (6M vs 3M)</h2>
+        <p class="text-muted">Generate forward basis spread matrices showing 6M - 3M across forward periods</p>
+    </div>
+    
+    <div class="calculator-card">
+        <div class="row g-3 align-items-end">
+            <div class="col-auto">
+                <label class="form-label">Currency:</label>
+                <select class="form-select" id="currency" style="width: 100px;">
+                    <option value="AUD" selected>AUD</option>
+                    <option value="NZD">NZD</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">As of Date:</label>
+                <input type="date" class="form-control" id="date" style="width: 150px;">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-outline-secondary" onclick="setQuickDate('today')">Today</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="setQuickDate('yesterday')">Yesterday</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="setQuickDate('lastweek')">Last Week</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="setQuickDate('lastmonth')">Last Month</button>
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-auto">
+                <button class="btn btn-teal" onclick="generateMatrix()">
+                    <i class="fas fa-table"></i> Generate Basis Matrix
+                </button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" onclick="browseDates()">
+                    <i class="fas fa-calendar"></i> Browse Dates
+                </button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-success" onclick="exportMatrix()">
+                    <i class="fas fa-file-excel"></i> Export to Excel
+                </button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-coral" onclick="show3DSurface()">
+                    <i class="fas fa-cube"></i> Show 3D Surface
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="matrixInfo" class="text-center text-muted mb-2" style="display: none;"></div>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white text-center">
+            <strong id="matrixTitle">AUD Forward Basis Matrix (6M - 3M)</strong>
+        </div>
+        <div class="card-body p-0">
+            <div id="matrixLoading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary"></div>
+                <p>Generating basis matrix...</p>
+            </div>
+            <div id="matrixContainer" class="table-responsive">
+                <p class="text-center text-muted py-5">Click "Generate Basis Matrix" to calculate forward basis spreads</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// Forward periods - EXACTLY like desktop
+const forwardPeriods = [
+    {label: '1BD', years: 1/365},
+    {label: '1m', years: 1/12},
+    {label: '2m', years: 2/12},
+    {label: '3m', years: 3/12},
+    {label: '6m', years: 6/12},
+    {label: '9m', years: 9/12},
+    {label: '1y', years: 1},
+    {label: '18m', years: 1.5},
+    {label: '2y', years: 2},
+    {label: '3y', years: 3},
+    {label: '4y', years: 4},
+    {label: '5y', years: 5},
+    {label: '7y', years: 7},
+    {label: '10y', years: 10},
+    {label: '12y', years: 12}
+];
+
+// Swap tenors (columns) - EXACTLY like desktop
+const swapTenors = [
+    {label: '1Y', years: 1},
+    {label: '2Y', years: 2},
+    {label: '3Y', years: 3},
+    {label: '4Y', years: 4},
+    {label: '5Y', years: 5},
+    {label: '7Y', years: 7},
+    {label: '10Y', years: 10},
+    {label: '12Y', years: 12},
+    {label: '15Y', years: 15},
+    {label: '20Y', years: 20},
+    {label: '25Y', years: 25},
+    {label: '30Y', years: 30}
+];
+
+let matrixData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    setQuickDate('today');
+});
+
+function setQuickDate(period) {
+    const today = new Date();
+    let date = new Date();
+    
+    if (period === 'yesterday') {
+        date.setDate(today.getDate() - 1);
+    } else if (period === 'lastweek') {
+        date.setDate(today.getDate() - 7);
+    } else if (period === 'lastmonth') {
+        date.setMonth(today.getMonth() - 1);
+    }
+    
+    document.getElementById('date').value = date.toISOString().split('T')[0];
+}
+
+function browseDates() {
+    alert('Browse Dates - Coming soon. Use the date picker for now.');
+}
+
+function show3DSurface() {
+    alert('3D Surface visualization - Coming soon.');
+}
+
+async function generateMatrix() {
+    const currency = document.getElementById('currency').value;
+    const date = document.getElementById('date').value;
+    
+    document.getElementById('matrixLoading').style.display = 'block';
+    document.getElementById('matrixContainer').innerHTML = '';
+    document.getElementById('matrixTitle').textContent = `${currency} Forward Basis Matrix (6M - 3M)`;
+    matrixData = [];
+    
+    for (const fwd of forwardPeriods) {
+        const row = {forward: fwd.label, basis: []};
+        for (const tenor of swapTenors) {
+            try {
+                // Get 6M forward rate
+                const resp6m = await fetch('/api/calculate/forward-rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({date, currency, forward_start: fwd.years, swap_tenor: tenor.years, floating_rate: '6M'})
+                });
+                const rate6m = await resp6m.json();
+                
+                // Get 3M forward rate
+                const resp3m = await fetch('/api/calculate/forward-rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({date, currency, forward_start: fwd.years, swap_tenor: tenor.years, floating_rate: '3M'})
+                });
+                const rate3m = await resp3m.json();
+                
+                if (rate6m.error || rate3m.error) {
+                    row.basis.push(null);
+                } else {
+                    // Basis = 6M - 3M in basis points
+                    const basis = (rate6m.forward_rate - rate3m.forward_rate) * 100;
+                    row.basis.push(basis);
+                }
+            } catch { row.basis.push(null); }
+        }
+        matrixData.push(row);
+    }
+    
+    // Build table
+    let html = '<table class="table table-bordered matrix-table mb-0"><thead><tr><th class="fwd-col">Fwd Period</th>';
+    swapTenors.forEach(t => html += `<th>${t.label}</th>`);
+    html += '</tr></thead><tbody>';
+    
+    matrixData.forEach(row => {
+        html += `<tr><td class="fwd-col"><strong>${row.forward}</strong></td>`;
+        row.basis.forEach(b => {
+            if (b !== null) {
+                const cls = b > 0 ? 'positive' : b < 0 ? 'negative' : '';
+                const sign = b > 0 ? '+' : '';
+                html += `<td class="${cls}">${sign}${b.toFixed(3)}</td>`;
+            } else {
+                html += '<td>-</td>';
+            }
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    
+    document.getElementById('matrixContainer').innerHTML = html;
+    document.getElementById('matrixLoading').style.display = 'none';
+    document.getElementById('matrixInfo').style.display = 'block';
+    document.getElementById('matrixInfo').textContent = `Basis matrix generated for ${currency} as of ${date} - Showing 6M - 3M basis in bp`;
+}
+
+function exportMatrix() {
+    if (!matrixData) { alert('Generate matrix first'); return; }
+    let csv = 'Fwd Period,' + swapTenors.map(t => t.label).join(',') + '\n';
+    matrixData.forEach(row => csv += row.forward + ',' + row.basis.map(b => b !== null ? b.toFixed(3) : '').join(',') + '\n');
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `forward_basis_matrix_${document.getElementById('currency').value}_${document.getElementById('date').value}.csv`; a.click();
+}
+</script>
+{% endblock %}

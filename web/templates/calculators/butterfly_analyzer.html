@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Butterfly Analyzer - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.calculator-card { background: white; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.result-card { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }
+.result-value { font-size: 1.8rem; font-weight: bold; }
+.positive { color: #27ae60; }
+.negative { color: #e74c3c; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-3"><i class="fas fa-bezier-curve"></i> Butterfly Analyzer</h2>
+    <p class="text-muted">Butterfly = Mid - (Short + Long) / 2</p>
+    
+    <div class="calculator-card">
+        <h5><i class="fas fa-calculator"></i> Spot Butterfly Calculator</h5>
+        <div class="row g-3 mb-3">
+            <div class="col-md-2">
+                <label class="form-label">Currency</label>
+                <select class="form-select" id="currency"><option value="AUD">AUD</option><option value="NZD">NZD</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Date</label>
+                <input type="date" class="form-control" id="date">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Floating Rate</label>
+                <select class="form-select" id="floatingRate"><option value="AONIA">AONIA</option><option value="3M">3M BBSW</option><option value="6M">6M BBSW</option></select>
+            </div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-2">
+                <label class="form-label">Short Tenor</label>
+                <select class="form-select" id="shortTenor"><option value="3Y">3Y</option><option value="4Y">4Y</option><option value="5Y" selected>5Y</option><option value="6Y">6Y</option><option value="7Y">7Y</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Mid Tenor</label>
+                <select class="form-select" id="midTenor"><option value="5Y">5Y</option><option value="6Y">6Y</option><option value="7Y" selected>7Y</option><option value="8Y">8Y</option><option value="9Y">9Y</option><option value="10Y">10Y</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Long Tenor</label>
+                <select class="form-select" id="longTenor"><option value="7Y">7Y</option><option value="8Y">8Y</option><option value="9Y">9Y</option><option value="10Y" selected>10Y</option><option value="12Y">12Y</option><option value="15Y">15Y</option></select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" onclick="calculateButterfly()"><i class="fas fa-calculator"></i> Calculate</button>
+            </div>
+        </div>
+        <div class="row" id="spotResults" style="display: none;">
+            <div class="col-md-2"><div class="result-card"><small class="text-muted">Short Rate</small><div class="result-value" id="shortRate">-</div></div></div>
+            <div class="col-md-2"><div class="result-card"><small class="text-muted">Mid Rate</small><div class="result-value" id="midRate">-</div></div></div>
+            <div class="col-md-2"><div class="result-card"><small class="text-muted">Long Rate</small><div class="result-value" id="longRate">-</div></div></div>
+            <div class="col-md-3"><div class="result-card"><small class="text-muted">Butterfly</small><div class="result-value" id="butterflyValue">-</div></div></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white"><i class="fas fa-chart-line"></i> Butterfly History</div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-2"><label class="form-label">Start Date</label><input type="date" class="form-control" id="chartStartDate"></div>
+                <div class="col-md-2"><label class="form-label">End Date</label><input type="date" class="form-control" id="chartEndDate"></div>
+                <div class="col-md-2 d-flex align-items-end"><button class="btn btn-success" onclick="loadButterflyHistory()"><i class="fas fa-chart-line"></i> Load Chart</button></div>
+            </div>
+            <canvas id="butterflyChart" height="300"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let butterflyChart = null;
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').value = today;
+    document.getElementById('chartEndDate').value = today;
+    const start = new Date(); start.setMonth(start.getMonth() - 6);
+    document.getElementById('chartStartDate').value = start.toISOString().split('T')[0];
+});
+
+function calculateButterfly() {
+    fetch('/api/calculate/butterfly', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            currency: document.getElementById('currency').value,
+            date: document.getElementById('date').value,
+            short_tenor: document.getElementById('shortTenor').value,
+            mid_tenor: document.getElementById('midTenor').value,
+            long_tenor: document.getElementById('longTenor').value,
+            floating_rate: document.getElementById('floatingRate').value
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.error) { alert(result.error); return; }
+        document.getElementById('shortRate').textContent = result.short_rate.toFixed(4) + '%';
+        document.getElementById('midRate').textContent = result.mid_rate.toFixed(4) + '%';
+        document.getElementById('longRate').textContent = result.long_rate.toFixed(4) + '%';
+        const el = document.getElementById('butterflyValue');
+        el.textContent = (result.butterfly_bp > 0 ? '+' : '') + result.butterfly_bp.toFixed(2) + ' bp';
+        el.className = 'result-value ' + (result.butterfly_bp > 0 ? 'positive' : 'negative');
+        document.getElementById('spotResults').style.display = 'flex';
+    }).catch(e => alert('Error: ' + e));
+}
+
+function loadButterflyHistory() {
+    const params = new URLSearchParams({
+        currency: document.getElementById('currency').value,
+        short_tenor: document.getElementById('shortTenor').value,
+        mid_tenor: document.getElementById('midTenor').value,
+        long_tenor: document.getElementById('longTenor').value,
+        floating_rate: document.getElementById('floatingRate').value,
+        start_date: document.getElementById('chartStartDate').value,
+        end_date: document.getElementById('chartEndDate').value
+    });
+    fetch('/api/butterfly-history?' + params)
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { alert(data.error); return; }
+        if (butterflyChart) butterflyChart.destroy();
+        const ctx = document.getElementById('butterflyChart').getContext('2d');
+        butterflyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.date),
+                datasets: [{
+                    label: 'Butterfly (bp)',
+                    data: data.map(d => d.butterfly),
+                    borderColor: '#9b59b6',
+                    backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                    fill: true, tension: 0.1
+                }]
+            },
+            options: { responsive: true, scales: { y: { title: { display: true, text: 'Basis Points' } } } }
+        });
+    }).catch(e => alert('Error: ' + e));
+}
+</script>
+{% endblock %}

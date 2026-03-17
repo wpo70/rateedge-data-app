@@ -1,0 +1,175 @@
+================================================================================
+RATEEDGE VERSION 10.0 - COMPLETE PACKAGE
+EVERYTHING FIXED - ALL IN ONE
+================================================================================
+
+WHAT'S IN THIS PACKAGE:
+1. swap_rate_gui.py (189 KB) - Fixed GUI with all features
+2. import_ois_complete_v2.py (9 KB) - OIS data importer
+3. import_benchmark_rates.py (10 KB) - Benchmark data importer
+
+================================================================================
+STEP 1: INSTALL THE GUI
+================================================================================
+
+1. Backup your current swap_rate_gui.py:
+   RateEdge_v7.1\frontend\swap_rate_gui.py → swap_rate_gui_BACKUP.py
+
+2. Copy NEW swap_rate_gui.py to:
+   RateEdge_v7.1\frontend\swap_rate_gui.py
+
+3. Delete cache:
+   RateEdge_v7.1\frontend\__pycache__\
+
+GUI FEATURES:
+✓ Benchmark tab with O/N first, no AONIA text
+✓ OIS tab split into Short Term / Medium Term / CB Meeting
+✓ Table views work everywhere
+✓ Currency filters work
+✓ No more "benchmark_rates" errors
+
+================================================================================
+STEP 2: CONFIGURE DATABASE PATH (IMPORTANT!)
+================================================================================
+
+BEFORE running ANY import script, edit it to use YOUR database path.
+
+Open import_ois_complete_v2.py in Notepad
+Find this line (around line 13):
+  DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'database', 'swap_rates.db')
+
+REPLACE with YOUR actual database path:
+  DATABASE_PATH = r'C:\Users\willp\IRS_DATA_Manager\latest RateEdge 13112025\RateEdge_v7.1\database\swap_rates.db'
+
+Do the SAME for import_benchmark_rates.py
+
+This ensures the scripts use YOUR existing database with 7.5 years of data.
+
+================================================================================
+STEP 3: IMPORT OIS DATA
+================================================================================
+
+1. Put AONIA files in:
+   C:\Users\willp\IRS_DATA_Manager\BlueGamma\
+
+2. Edit import_ois_complete_v2.py database path (see Step 2)
+
+3. Copy import_ois_complete_v2.py to your RateEdge folder
+
+4. Run: python import_ois_complete_v2.py
+
+AONIA FILES NEEDED:
+- 2025-11-14 AONIA 1W Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 2W Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 3W Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 1M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 2M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 3M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 6M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 9M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 12M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 18M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 24M Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 3Y Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 4Y Historical Swap Rates - BlueGamma.xlsx
+- 2025-11-14 AONIA 5Y Historical Swap Rates - BlueGamma.xlsx
+- ... and all other tenors up to 40Y
+
+================================================================================
+STEP 4: IMPORT BENCHMARK DATA
+================================================================================
+
+1. Put benchmark files in:
+   C:\Users\willp\IRS_DATA_Manager\BlueGamma\
+
+2. Edit import_benchmark_rates.py database path (see Step 2)
+
+3. Copy import_benchmark_rates.py to your RateEdge folder
+
+4. Run: python import_benchmark_rates.py
+
+BENCHMARK FILES NEEDED:
+- RBA Cash Rate Historical - BlueGamma.xlsx
+- BBSW 1M Historical - BlueGamma.xlsx
+- BBSW 2M Historical - BlueGamma.xlsx
+- BBSW 3M Historical - BlueGamma.xlsx
+- BBSW 4M Historical - BlueGamma.xlsx
+- BBSW 5M Historical - BlueGamma.xlsx
+- BBSW 6M Historical - BlueGamma.xlsx
+- OCR Historical - BlueGamma.xlsx (or RBNZ)
+- BKBM 1M Historical - BlueGamma.xlsx
+- BKBM 2M Historical - BlueGamma.xlsx
+- BKBM 3M Historical - BlueGamma.xlsx
+
+================================================================================
+STEP 5: TEST EVERYTHING
+================================================================================
+
+1. Start RateEdge
+
+2. BENCHMARK TAB → Table View
+   - Should show: Date | Cur | O/N | 1M | 2M | 3M | 4M | 5M | 6M
+   - All numbers, no "AONIA" text
+   - AUD: RBA + BBSW rates
+   - NZD: RBNZ + BKBM rates
+
+3. OIS TAB → SHORT TERM → Table View
+   - Should show: 1W, 2W, 3W, 1M, 2M, 3M, 4M, 5M, 6M, 9M, 1Y, 18M, 2Y
+   - All AONIA data
+
+4. OIS TAB → MEDIUM TERM → Table View
+   - Should show: 3Y, 4Y, 5Y, 6Y, 7Y, 8Y, 9Y, 10Y, 12Y, 15Y, 20Y, 25Y, 30Y, 35Y, 40Y
+   - All AONIA data
+
+================================================================================
+ALL FIXES IN V10:
+================================================================================
+
+GUI:
+✓ O/N column first in benchmark table
+✓ No "AONIA" text in benchmark O/N column
+✓ Fixed "no such table: benchmark_rates" error
+✓ AONIA only appears in OIS tab
+✓ OIS split into 3 sub-tabs (Short/Medium/CB Meeting)
+✓ Table views on all tabs
+✓ Currency filters work everywhere
+
+OIS IMPORT:
+✓ Handles filenames with SPACES
+✓ All tenors from 1W to 40Y
+✓ Includes 4M, 5M, 6Y, 8Y, 9Y, 25Y, 35Y, 40Y
+✓ Smart duplicate detection
+✓ Shows detailed statistics
+
+BENCHMARK IMPORT:
+✓ Imports RBA Cash Rate (AUD)
+✓ Imports RBNZ Official Cash Rate (NZD)
+✓ Imports BBSW 1M-6M (AUD)
+✓ Imports BKBM 1M-3M (NZD)
+✓ Same BlueGamma Excel format as OIS
+
+================================================================================
+CRITICAL: DATABASE PATH CONFIGURATION
+================================================================================
+
+BEFORE running import scripts:
+
+1. Find YOUR database file location
+2. Edit BOTH import scripts
+3. Change DATABASE_PATH to YOUR path
+4. Save the scripts
+5. Then run them
+
+This ensures they use YOUR existing database with all your data.
+
+================================================================================
+FILE SIZES:
+================================================================================
+
+swap_rate_gui.py: 189 KB (4,113 lines)
+import_ois_complete_v2.py: 9 KB (250 lines)
+import_benchmark_rates.py: 10 KB (270 lines)
+
+================================================================================
+THIS IS VERSION 10.0 - EVERYTHING WORKS
+================================================================================

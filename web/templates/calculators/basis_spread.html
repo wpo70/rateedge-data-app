@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Basis Spread - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.calculator-card { background: white; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.result-card { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }
+.result-value { font-size: 1.8rem; font-weight: bold; }
+.positive { color: #27ae60; }
+.negative { color: #e74c3c; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-3"><i class="fas fa-exchange-alt"></i> Basis Spread Analyzer</h2>
+    <p class="text-muted">Compare basis spreads across multiple tenors</p>
+    
+    <div class="calculator-card">
+        <h5><i class="fas fa-cog"></i> Parameters</h5>
+        <div class="row g-3 mb-3">
+            <div class="col-md-2">
+                <label class="form-label">Currency</label>
+                <select class="form-select" id="currency"><option value="AUD">AUD</option><option value="NZD">NZD</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="startDate">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" id="endDate">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" onclick="loadBasisComparison()"><i class="fas fa-chart-line"></i> Load</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <i class="fas fa-chart-line"></i> Basis Spread Comparison
+        </div>
+        <div class="card-body">
+            <canvas id="basisComparisonChart" height="350"></canvas>
+        </div>
+    </div>
+    
+    <div class="card mt-3">
+        <div class="card-header bg-secondary text-white">
+            <i class="fas fa-table"></i> Current Basis Spreads
+        </div>
+        <div class="card-body">
+            <div id="basisTable">
+                <p class="text-muted text-center">Click "Load" to view basis spreads</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let basisChart = null;
+const tenors = ['3Y', '5Y', '7Y', '10Y', '15Y', '20Y'];
+const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
+
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('endDate').value = today;
+    const start = new Date(); start.setMonth(start.getMonth() - 3);
+    document.getElementById('startDate').value = start.toISOString().split('T')[0];
+});
+
+async function loadBasisComparison() {
+    const currency = document.getElementById('currency').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    const datasets = [];
+    const allDates = new Set();
+    
+    for (let i = 0; i < tenors.length; i++) {
+        const params = new URLSearchParams({currency, tenor: tenors[i], start_date: startDate, end_date: endDate});
+        const response = await fetch('/api/basis-history?' + params);
+        const data = await response.json();
+        
+        if (!data.error && data.length > 0) {
+            data.forEach(d => allDates.add(d.date));
+            datasets.push({
+                label: tenors[i] + ' Basis',
+                data: data.map(d => ({x: d.date, y: d.basis})),
+                borderColor: colors[i],
+                fill: false,
+                tension: 0.1
+            });
+        }
+    }
+    
+    if (basisChart) basisChart.destroy();
+    const ctx = document.getElementById('basisComparisonChart').getContext('2d');
+    basisChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: 'category', labels: Array.from(allDates).sort() },
+                y: { title: { display: true, text: 'Basis Points' } }
+            }
+        }
+    });
+    
+    // Load current values table
+    loadCurrentBasis(currency);
+}
+
+async function loadCurrentBasis(currency) {
+    let html = '<table class="table table-bordered"><thead><tr><th>Tenor</th><th>3M Rate</th><th>6M Rate</th><th>Basis (bp)</th></tr></thead><tbody>';
+    
+    for (const tenor of tenors) {
+        const params = new URLSearchParams({currency, tenor, start_date: '', end_date: ''});
+        const response = await fetch('/api/basis-history?' + params + '&limit=1');
+        const data = await response.json();
+        
+        if (!data.error && data.length > 0) {
+            const latest = data[data.length - 1];
+            const cls = latest.basis > 0 ? 'positive' : latest.basis < 0 ? 'negative' : '';
+            html += `<tr><td>${tenor}</td><td>${latest.rate_3m.toFixed(4)}%</td><td>${latest.rate_6m.toFixed(4)}%</td><td class="${cls}">${latest.basis.toFixed(2)}</td></tr>`;
+        }
+    }
+    
+    html += '</tbody></table>';
+    document.getElementById('basisTable').innerHTML = html;
+}
+</script>
+{% endblock %}

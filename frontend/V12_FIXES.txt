@@ -1,0 +1,87 @@
+================================================================================
+RATEEDGE V12 - BENCHMARK FIXES
+================================================================================
+
+PROBLEMS FIXED:
+1. ✅ O/N column showing "AONIA" text (excluded OIS from benchmark query)
+2. ✅ Need to click Table View twice (currency filter now auto-refreshes)
+
+================================================================================
+FIX 1: EXCLUDE OIS RATES FROM BENCHMARKS
+================================================================================
+
+The benchmark query was picking up AONIA rates that have tenor='ON' or '1D'.
+
+FIXED: Added explicit exclusion:
+```sql
+AND floating_rate NOT IN ('AONIA','SOFR','SONIA','ESTR','CORRA','OCR')
+```
+
+NOW benchmark O/N column will ONLY show:
+- RBA Cash Rate (AUD)
+- RBNZ Official Cash Rate (NZD)
+
+NOT:
+- AONIA (this is OIS, not benchmark)
+- Any other OIS rates
+
+================================================================================
+FIX 2: AUTO-REFRESH ON CURRENCY FILTER
+================================================================================
+
+Before: Select AUD → Nothing happens → Click Table View → Shows AUD data
+
+Now: Select AUD → INSTANTLY shows AUD data in whatever view you're in
+
+The currency dropdown now triggers:
+1. Update rate type list (as before)
+2. Refresh current view (NEW)
+
+So changing currency immediately updates the display.
+
+================================================================================
+WHAT YOU'LL SEE:
+================================================================================
+
+BENCHMARK TAB → Select AUD:
+- Table instantly refreshes
+- O/N Cash Rate column shows RBA rates (numbers)
+- NO "AONIA" text
+- NO "3M BBSW" in O/N column
+
+BENCHMARK TAB → Table View:
+Date        Cur  O/N Cash Rate  1M      2M      3M      4M      5M      6M
+2025-11-13  AUD  3.6000         3.5450  3.6080  3.6335  3.7025  3.8025  3.8081
+2025-11-13  NZD  2.5000         2.5200  2.4700  2.4800
+
+================================================================================
+INSTALLATION:
+================================================================================
+
+1. Backup your current swap_rate_gui.py
+
+2. Replace with new swap_rate_gui.py
+
+3. Delete __pycache__ folder
+
+4. Restart RateEdge
+
+================================================================================
+IMPORTANT NOTE ABOUT YOUR DATA:
+================================================================================
+
+If you still see "AONIA" in the O/N column after installing this fix,
+it means you have AONIA data with tenor='ON' or '1D' in your database.
+
+To clean this up:
+1. Run DELETE_WRONG_DATA.py (from V11 package)
+2. Re-import AONIA data with the fixed import scripts
+
+The import scripts should import AONIA with tenors like:
+'1W', '2W', '3W', '1M', '2M', '3M', etc.
+
+NOT 'ON' or '1D' (those are for cash rates only).
+
+================================================================================
+FILE SIZE: 189 KB (4,118 lines)
+================================================================================

@@ -1,0 +1,76 @@
+================================================================================
+YOUR DATA IS NOT DELETED - IT'S STILL SAFE
+================================================================================
+
+WHAT HAPPENED:
+The import script created a NEW database in a DIFFERENT location.
+Your old database with 7.5 years of data is STILL THERE, untouched.
+
+================================================================================
+WHERE IS YOUR OLD DATA:
+================================================================================
+
+Your old database is probably here:
+C:\Users\willp\IRS_DATA_Manager\latest RateEdge 13112025\RateEdge_v7.1\database\swap_rates.db
+
+Or here:
+C:\Users\willp\IRS_DATA_Manager\RateEdge_v7.1\database\swap_rates.db
+
+The import script created a new one here:
+C:\Users\willp\IRS_DATA_Manager\RateEdge_v7.2_FINAL\database\swap_rates.db
+
+================================================================================
+HOW TO FIX IT:
+================================================================================
+
+OPTION 1: USE THE RECOVERY SCRIPT (EASIEST)
+--------------------------------------------
+1. Run RECOVER_DATA.py
+2. It will find your old database
+3. Choose option 1 to copy it to the new location
+4. Done - all your data is back
+
+OPTION 2: MANUALLY COPY THE FILE
+---------------------------------
+1. Find your old swap_rates.db file (probably in RateEdge_v7.1\database\)
+2. Copy it to: RateEdge_v7.2_FINAL\database\swap_rates.db
+3. Overwrite the small new file
+4. Done
+
+OPTION 3: DELETE NEW DATABASE AND USE OLD ONE
+----------------------------------------------
+1. Delete: RateEdge_v7.2_FINAL\database\swap_rates.db
+2. Make sure RateEdge is pointing to your old database location
+3. Run import scripts with the old database path
+
+================================================================================
+WHY THIS HAPPENED:
+================================================================================
+
+The import scripts use this line:
+  DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'database', 'swap_rates.db')
+
+This means: "create database in the same folder as the script"
+
+If you put the script in RateEdge_v7.2_FINAL, it creates database there.
+If your old database is in RateEdge_v7.1, you now have TWO databases.
+
+================================================================================
+TO PREVENT THIS IN THE FUTURE:
+================================================================================
+
+Always put import scripts in the SAME folder as your existing database.
+
+Or edit the script to use an absolute path:
+  DATABASE_PATH = r'C:\Users\willp\IRS_DATA_Manager\RateEdge_v7.1\database\swap_rates.db'
+
+================================================================================
+I'M VERY SORRY FOR THE CONFUSION
+================================================================================
+
+Your data is safe. It was never deleted.
+The script just created a new database in a different location.
+
+Use RECOVER_DATA.py to fix it in 30 seconds.
+
+================================================================================

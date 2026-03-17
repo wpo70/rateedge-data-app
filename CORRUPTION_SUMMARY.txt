@@ -1,0 +1,42 @@
+================================================================================
+RATEEDGE DATABASE CORRUPTION SUMMARY
+Generated: 2025-11-26 04:38:17.695139
+================================================================================
+
+OVERVIEW
+----------------------------------------
+Total corrupted records: 57225
+
+BY CURRENCY:
+--------------------------------------------------------------------------------
+Currency   Total      Too High     Negative     Date Range
+--------------------------------------------------------------------------------
+JPY        31319      20006        11313        2018-06-04 to 2025-10-27
+EUR        16393      6760         9633         2018-06-04 to 2022-08-12
+AUD        4225       4224         1            2019-06-20 to 2022-03-21
+NZD        3119       3119         0            2019-08-08 to 2022-04-13
+CAD        1551       1551         0            2020-07-14 to 2021-10-07
+GBP        618        618          0            2018-06-04 to 2025-04-18
+
+
+RECOMMENDED ACTIONS:
+----------------------------------------
+
+1. AUD/NZD/CAD/GBP - TOO HIGH rates:
+   - These are likely rates that were already in % form but got stored as decimals
+   - FIX: Divide by 100
+   - Example: 0.7575 → 0.007575 (0.76%)
+
+2. EUR/JPY - NEGATIVE rates:
+   - May be VALID (Europe and Japan had negative rates 2019-2022)
+   - REVIEW each case - if rate is between -0.01 and 0 it's probably valid
+   - Extremely negative rates (< -1) are likely corrupted
+
+3. Rates > 100% (rate > 1.0):
+   - Definitely corrupted
+   - DELETE or divide by 100
+
+NEXT STEPS:
+- Review CORRUPTED_RATES.csv
+- Decide which records to fix vs delete
+- Run fix script or re-import from source

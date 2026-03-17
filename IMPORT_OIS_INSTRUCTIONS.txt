@@ -1,0 +1,144 @@
+================================================================================
+IMPORT YOUR FRESH AONIA (AUD OIS) DATA
+================================================================================
+
+YOU HAVE:
+- 1W to 24M (2Y) AONIA files uploaded
+- Will get 3Y+ files next
+
+THIS SCRIPT IMPORTS ALL OF THEM IN ONE GO.
+
+================================================================================
+STEP 1: ORGANIZE YOUR FILES
+================================================================================
+
+Put ALL your AONIA Excel files in:
+C:\Users\willp\IRS_DATA_Manager\BlueGamma\
+
+Files should be named like:
+- 2025-11-14_AONIA_1W_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_2W_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_3W_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_1M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_2M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_3M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_6M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_9M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_12M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_18M_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_24M_Historical_Swap_Rates_-_BlueGamma.xlsx
+
+AND when you get them:
+- 2025-11-14_AONIA_3Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_4Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_5Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_7Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_10Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_12Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_15Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_20Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+- 2025-11-14_AONIA_30Y_Historical_Swap_Rates_-_BlueGamma.xlsx
+
+================================================================================
+STEP 2: COPY IMPORT SCRIPT
+================================================================================
+
+Copy import_ois_complete.py to:
+C:\Users\willp\IRS_DATA_Manager\latest RateEdge 13112025\RateEdge_v7.1\
+
+================================================================================
+STEP 3: RUN THE IMPORT
+================================================================================
+
+Double-click: import_ois_complete.py
+
+OR
+
+Open command prompt:
+cd C:\Users\willp\IRS_DATA_Manager\latest RateEdge 13112025\RateEdge_v7.1
+python import_ois_complete.py
+
+================================================================================
+WHAT IT DOES:
+================================================================================
+
+1. Finds all AONIA files in your BlueGamma folder
+2. Reads each Excel file
+3. Imports data to your RateEdge database
+4. Shows statistics:
+   - How many records imported
+   - Date range
+   - Records by tenor
+
+================================================================================
+WHAT YOU'LL SEE:
+================================================================================
+
+================================================================================
+IMPORTING AONIA (AUD OIS) DATA
+================================================================================
+Source: C:\Users\willp\IRS_DATA_Manager\BlueGamma
+Database: ...\database\swap_rates.db
+
+  ✓ 1W  :  245 new records,    0 duplicates
+  ✓ 2W  :  245 new records,    0 duplicates
+  ✓ 3W  :  245 new records,    0 duplicates
+  ✓ 1M  :  245 new records,    0 duplicates
+  ✓ 2M  :  245 new records,    0 duplicates
+  ✓ 3M  :  245 new records,    0 duplicates
+  ✓ 6M  :  245 new records,    0 duplicates
+  ✓ 9M  :  245 new records,    0 duplicates
+  ✓ 1Y  :  245 new records,    0 duplicates
+  ✓ 18M :  245 new records,    0 duplicates
+  ✓ 2Y  :  245 new records,    0 duplicates
+  - 3Y  : No file found
+  - 4Y  : No file found
+  (etc...)
+
+================================================================================
+IMPORT COMPLETE
+================================================================================
+Files found: 11
+Total records imported: 2,695
+
+================================================================================
+AONIA DATA STATISTICS
+================================================================================
+Total records: 2,695
+Date range: 2024-01-15 to 2025-11-13
+
+Records by tenor:
+  Short Term (0-2Y):
+    1W  :   245 records
+    2W  :   245 records
+    3W  :   245 records
+    1M  :   245 records
+    2M  :   245 records
+    3M  :   245 records
+    6M  :   245 records
+    9M  :   245 records
+    1Y  :   245 records
+    18M :   245 records
+    2Y  :   245 records
+================================================================================
+
+================================================================================
+THEN RUN RATEEDGE:
+================================================================================
+
+Your OIS data is now in the database.
+Start RateEdge and go to:
+  OIS Rates → Short Term (0-2Y) → Click "📊 Table View"
+
+You'll see all your AONIA data!
+
+================================================================================
+WHEN YOU GET 3Y+ FILES:
+================================================================================
+
+1. Put them in the BlueGamma folder
+2. Run import_ois_complete.py again
+3. It will import the new files
+4. Go to: OIS Rates → Medium Term (3Y+) → Click "📊 Table View"
+
+================================================================================

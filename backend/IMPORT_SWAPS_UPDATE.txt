@@ -1,0 +1,74 @@
+================================================================================
+v8.1 UPDATE - IMPORT SWAPS BUTTON
+================================================================================
+
+CHANGE:
+Bottom toolbar "Import Excel" button → "Import Swaps"
+
+NEW DIALOG:
+When you click "Import Swaps", you get a smart dialog:
+
+┌─────────────────────────────┐
+│   Import Swap Data          │
+├─────────────────────────────┤
+│ Currency:     [All ▼]       │
+│ Floating Rate:[All ▼]       │
+│                             │
+│ Select 'All' to import any  │
+│ swap data files.            │
+│                             │
+│      [Cancel] [Select Files]│
+└─────────────────────────────┘
+
+WORKFLOW:
+1. Click "Import Swaps" button
+2. Choose currency filter (or All)
+3. Choose floating rate filter (or All)
+4. Click "Select Files & Import"
+5. Select multiple Excel files
+6. Import happens automatically
+
+EXAMPLES:
+
+Import everything:
+- Currency: All
+- Floating Rate: All
+- Select all your files
+
+Import only AUD data:
+- Currency: AUD
+- Floating Rate: All
+- Select AONIA, BBSW, RBA files
+
+Import only AONIA:
+- Currency: All
+- Floating Rate: AONIA
+- Select all AONIA tenor files
+
+Import AUD BBSW only:
+- Currency: AUD
+- Floating Rate: BBSW
+- Select BBSW files
+
+The filters are just hints for YOU - the importer still auto-detects
+what each file is. So even if you select "All", it works perfectly.
+
+================================================================================
+THREE IMPORT OPTIONS NOW:
+================================================================================
+
+1. Main Tab → "Import Swaps" button
+   - Shows dialog with filters
+   - Good for general imports
+   
+2. Benchmark Tab → "Import Benchmark Data" button
+   - Direct import of BBSW/BKBM/RBA/RBNZ
+   - No dialog, straight to file selection
+   
+3. OIS Tab → "Import OIS Data" button
+   - Direct import of AONIA/SOFR/SONIA
+   - No dialog, straight to file selection
+
+Use whichever is most convenient!
+
+================================================================================

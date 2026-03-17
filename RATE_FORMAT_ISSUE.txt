@@ -1,0 +1,60 @@
+================================================================================
+RATE FORMAT ISSUE - DIAGNOSTIC TOOL
+================================================================================
+
+PROBLEM:
+Your Forward Swap Matrix and Swap Calculator are showing rates in the 300-500 range.
+This means rates are being DOUBLE-COUNTED (added twice, once as decimal, once as percentage).
+
+CAUSE:
+Your OLD data (7.5 years) is probably stored in DECIMAL format: 0.036 = 3.6%
+Your NEW data (from BlueGamma) is in PERCENTAGE format: 3.6000 = 3.6%
+
+The calculators are adding these together: 0.036 + 3.6 = 3.636
+Then displaying as percentage: 3.636 × 100 = 363.6
+
+================================================================================
+DIAGNOSTIC TOOL:
+================================================================================
+
+1. Run CHECK_RATE_FORMAT.py
+2. It will show you sample rates from:
+   - AONIA (newly imported OIS)
+   - BBSW (newly imported benchmark)
+   - Old swap rates
+
+3. It will tell you which format each is in
+
+================================================================================
+SOLUTION OPTIONS:
+================================================================================
+
+OPTION 1: DELETE NEW DATA, RE-IMPORT WITH DIVIDE BY 100
+--------------------------------------------------------
+1. Delete AONIA and BBSW data from database
+2. Modify import scripts to divide rates by 100
+3. Re-import
+
+OPTION 2: MULTIPLY OLD DATA BY 100
+-----------------------------------
+1. Run SQL to multiply all old rates by 100
+2. Keep new data as-is
+
+OPTION 3: I'LL FIX THE IMPORT SCRIPTS
+--------------------------------------
+I can modify the import scripts to:
+- Check if rate > 1 (percentage format)
+- If yes, divide by 100
+- If no, keep as-is
+
+================================================================================
+WHICH OPTION DO YOU WANT?
+================================================================================
+
+Run CHECK_RATE_FORMAT.py first to confirm the issue.
+Then tell me which option you prefer.
+
+Option 3 is probably easiest - I'll make the import scripts smart enough
+to handle both formats automatically.
+
+================================================================================

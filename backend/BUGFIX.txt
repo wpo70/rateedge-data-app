@@ -1,0 +1,17 @@
+================================================================================
+v8.1 BUGFIX - BUTTON OVERLAP FIXED
+================================================================================
+
+ISSUE:
+On Benchmark tab, "Import Benchmark Data" and "Table View" buttons
+were in the same grid column (column 10), causing overlap.
+
+FIX:
+Moved "Table View" button to column 11, giving each button its own space.
+
+NOW YOU'LL SEE:
+[Apply Filters] [Clear] [Import Benchmark Data] [Table View]
+
+All buttons properly spaced, no overlap.
+
+================================================================================

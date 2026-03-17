@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Forward Swap Matrix - RateEdge{% endblock %}
+{% block extra_css %}
+<style>
+.calculator-card { background: white; border: 2px solid #2c3e50; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.matrix-table { font-size: 0.85rem; }
+.matrix-table th { background: #2c3e50; color: white; text-align: center; padding: 8px; }
+.matrix-table td { text-align: center; padding: 6px; font-family: monospace; }
+.matrix-table tbody tr:nth-child(even) { background: #f8f9fa; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-3"><i class="fas fa-table"></i> Forward Swap Matrix</h2>
+    <p class="text-muted">Forward starting swap rates across tenors and start periods</p>
+    
+    <div class="calculator-card">
+        <h5><i class="fas fa-cog"></i> Matrix Parameters</h5>
+        <div class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">Currency</label>
+                <select class="form-select" id="currency"><option value="AUD">AUD</option><option value="NZD">NZD</option></select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">As of Date</label>
+                <input type="date" class="form-control" id="date">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Floating Rate</label>
+                <select class="form-select" id="floatingRate"><option value="AONIA">AONIA</option><option value="3M">3M BBSW</option><option value="6M">6M BBSW</option></select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" onclick="generateMatrix()"><i class="fas fa-table"></i> Generate</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between">
+            <span><i class="fas fa-th"></i> Forward Swap Rate Matrix</span>
+            <button class="btn btn-sm btn-light" onclick="exportMatrix()"><i class="fas fa-download"></i> Export CSV</button>
+        </div>
+        <div class="card-body p-0">
+            <div id="matrixLoading" class="text-center py-5" style="display: none;"><div class="spinner-border text-primary"></div><p>Generating...</p></div>
+            <div id="matrixContainer" class="table-responsive"><p class="text-center text-muted py-5">Click "Generate" to calculate forward rates</p></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const forwardPeriods = [{label:'Spot',years:0},{label:'1M',years:1/12},{label:'3M',years:0.25},{label:'6M',years:0.5},{label:'1Y',years:1},{label:'2Y',years:2},{label:'3Y',years:3},{label:'5Y',years:5},{label:'7Y',years:7},{label:'10Y',years:10}];
+const swapTenors = [{label:'1Y',years:1},{label:'2Y',years:2},{label:'3Y',years:3},{label:'5Y',years:5},{label:'7Y',years:7},{label:'10Y',years:10},{label:'15Y',years:15},{label:'20Y',years:20}];
+let matrixData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+});
+
+async function generateMatrix() {
+    const currency = document.getElementById('currency').value;
+    const date = document.getElementById('date').value;
+    const floatingRate = document.getElementById('floatingRate').value;
+    
+    document.getElementById('matrixLoading').style.display = 'block';
+    document.getElementById('matrixContainer').innerHTML = '';
+    matrixData = [];
+    
+    for (const fwd of forwardPeriods) {
+        const row = {forward: fwd.label, rates: []};
+        for (const tenor of swapTenors) {
+            try {
+                const response = await fetch('/api/calculate/forward-rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({date, currency, forward_start: fwd.years, swap_tenor: tenor.years, floating_rate: floatingRate})
+                });
+                const result = await response.json();
+                row.rates.push(result.error ? null : result.forward_rate);
+            } catch { row.rates.push(null); }
+        }
+        matrixData.push(row);
+    }
+    
+    let html = '<table class="table table-bordered matrix-table mb-0"><thead><tr><th>Forward</th>';
+    swapTenors.forEach(t => html += `<th>${t.label}</th>`);
+    html += '</tr></thead><tbody>';
+    matrixData.forEach(row => {
+        html += `<tr><td><strong>${row.forward}</strong></td>`;
+        row.rates.forEach(r => html += r !== null ? `<td>${r.toFixed(3)}%</td>` : '<td>-</td>');
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    
+    document.getElementById('matrixContainer').innerHTML = html;
+    document.getElementById('matrixLoading').style.display = 'none';
+}
+
+function exportMatrix() {
+    if (!matrixData) { alert('Generate matrix first'); return; }
+    let csv = 'Forward,' + swapTenors.map(t => t.label).join(',') + '\n';
+    matrixData.forEach(row => csv += row.forward + ',' + row.rates.map(r => r !== null ? r.toFixed(4) : '').join(',') + '\n');
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `forward_swap_matrix_${document.getElementById('date').value}.csv`; a.click();
+}
+</script>
+{% endblock %}

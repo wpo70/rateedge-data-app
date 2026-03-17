@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - RateEdge{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+            <p class="text-muted">RateEdge Professional - Interest Rate Swap Analytics</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-database"></i> Total Records</h5>
+                    <h2 class="mb-0">{{ total_records | default(0) | int }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-calendar"></i> Latest Date</h5>
+                    <h2 class="mb-0">{{ latest_date | default('N/A') }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-globe"></i> Currencies</h5>
+                    <h2 class="mb-0">{{ currencies | default(0) }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Access to Data -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-database"></i> Data Views
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('swap_rates') }}" class="btn btn-outline-secondary w-100 py-3">
+                                <i class="fas fa-exchange-alt fa-2x mb-2"></i><br>Swap Rates
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('benchmark') }}" class="btn btn-outline-secondary w-100 py-3">
+                                <i class="fas fa-university fa-2x mb-2"></i><br>Benchmark Rates
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('ois') }}" class="btn btn-outline-secondary w-100 py-3">
+                                <i class="fas fa-chart-area fa-2x mb-2"></i><br>OIS Rates
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ url_for('import_data') }}" class="btn btn-outline-secondary w-100 py-3">
+                                <i class="fas fa-upload fa-2x mb-2"></i><br>Import Data
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calculators Quick Access -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-calculator"></i> Analysis Tools
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2 mb-2">
+                            <a href="{{ url_for('basis_analyzer') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-chart-bar fa-2x mb-2"></i><br>Basis Analyzer
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-2">
+                            <a href="{{ url_for('forward_basis_matrix') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-th fa-2x mb-2"></i><br>Forward Basis
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-2">
+                            <a href="{{ url_for('forward_swap_matrix') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-table fa-2x mb-2"></i><br>Forward Swap
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-2">
+                            <a href="{{ url_for('butterfly_analyzer') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-bezier-curve fa-2x mb-2"></i><br>Butterfly
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-2">
+                            <a href="{{ url_for('basis_spread') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-exchange-alt fa-2x mb-2"></i><br>Basis Spread
+                            </a>
+                        </div>
+                        <div class="col-md-2 mb-2">
+                            <a href="{{ url_for('relative_value') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-balance-scale fa-2x mb-2"></i><br>Relative Value
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

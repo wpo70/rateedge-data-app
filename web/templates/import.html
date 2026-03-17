@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Import Data - RateEdge{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-upload"></i> Import Market Data</h2>
+            <p class="text-muted">Upload Excel files containing swap rates, OIS, or benchmark data</p>
+        </div>
+    </div>
+
+    <!-- Import Options -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-file-excel"></i> Upload Files
+                </div>
+                <div class="card-body">
+                    <form id="importForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Select Files</label>
+                            <input type="file" class="form-control" id="fileInput" name="files[]" 
+                                   accept=".xlsx,.xls" multiple required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle"></i> 
+                                Select one or more Excel files. Supports: AONIA, BBSW, BKBM, RBA, RBNZ data.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div id="fileList" class="alert alert-info" style="display: none;">
+                                <strong>Selected Files:</strong>
+                                <ul id="fileListItems" class="mb-0 mt-2"></ul>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload & Import
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Progress -->
+    <div class="row mt-4" id="progressSection" style="display: none;">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-spinner fa-spin"></i> Import Progress
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="progressBar" role="progressbar" style="width: 0%">0%</div>
+                    </div>
+                    <div id="progressLog" style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.9rem;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Results -->
+    <div class="row mt-4" id="resultsSection" style="display: none;">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-check-circle"></i> Import Complete
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check"></i> Success!</h5>
+                        <p class="mb-0">
+                            Imported <strong id="totalImported">0</strong> new records. 
+                            Skipped <strong id="totalDuplicates">0</strong> duplicates.
+                        </p>
+                    </div>
+                    <div id="resultsDetails"></div>
+                    <button class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-redo"></i> Import More Files
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const files = e.target.files;
+    if (files.length > 0) {
+        const fileList = document.getElementById('fileList');
+        const fileListItems = document.getElementById('fileListItems');
+        fileListItems.innerHTML = '';
+        
+        for (let i = 0; i < files.length; i++) {
+            const li = document.createElement('li');
+            li.textContent = files[i].name;
+            fileListItems.appendChild(li);
+        }
+        
+        fileList.style.display = 'block';
+    }
+});
+
+document.getElementById('importForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('fileInput');
+    const files = fileInput.files;
+    
+    if (files.length === 0) {
+        alert('Please select at least one file');
+        return;
+    }
+    
+    // Show progress section
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('uploadBtn').disabled = true;
+    
+    const progressLog = document.getElementById('progressLog');
+    progressLog.innerHTML = '<p class="text-info">Starting import...</p>';
+    
+    // Create FormData
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
+    }
+    
+    // Upload files
+    fetch('/api/import', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressBar').textContent = '100%';
+        
+        if (data.success) {
+            // Show results
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('totalImported').textContent = data.total_imported.toLocaleString();
+            document.getElementById('totalDuplicates').textContent = data.total_duplicates.toLocaleString();
+            
+            // Show file details
+            let detailsHtml = '<table class="table table-sm"><thead><tr><th>File</th><th>Status</th><th>Records</th></tr></thead><tbody>';
+            data.results.forEach(result => {
+                const status = result.result.success ? 
+                    '<span class="badge bg-success">Success</span>' : 
+                    '<span class="badge bg-danger">Failed</span>';
+                const records = result.result.success ? 
+                    result.result.records_imported : 
+                    result.result.error;
+                detailsHtml += `<tr><td>${result.filename}</td><td>${status}</td><td>${records}</td></tr>`;
+            });
+            detailsHtml += '</tbody></table>';
+            document.getElementById('resultsDetails').innerHTML = detailsHtml;
+            
+            progressLog.innerHTML += '<p class="text-success"><strong>Import completed successfully!</strong></p>';
+        } else {
+            progressLog.innerHTML += '<p class="text-danger"><strong>Import failed: ' + data.error + '</strong></p>';
+        }
+        
+        document.getElementById('uploadBtn').disabled = false;
+    })
+    .catch(error => {
+        progressLog.innerHTML += '<p class="text-danger"><strong>Error: ' + error + '</strong></p>';
+        document.getElementById('uploadBtn').disabled = false;
+    });
+});
+</script>
+{% endblock %}

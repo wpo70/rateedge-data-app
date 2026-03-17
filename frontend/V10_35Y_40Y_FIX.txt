@@ -1,0 +1,39 @@
+================================================================================
+RATEEDGE V10.1 - ADDED 35Y AND 40Y TO OIS MEDIUM TERM
+================================================================================
+
+WHAT WAS MISSING:
+The OIS Medium Term tab only showed tenors up to 30Y.
+AUD OIS data includes 35Y and 40Y tenors.
+
+WHAT'S FIXED:
+✓ OIS Medium Term now shows: 3Y, 4Y, 5Y, 7Y, 10Y, 12Y, 15Y, 20Y, 30Y, 35Y, 40Y
+✓ Table view includes 35Y and 40Y columns
+✓ Both list view and pivot view updated
+
+================================================================================
+INSTALLATION:
+================================================================================
+
+1. Backup your current swap_rate_gui.py
+
+2. Replace with new swap_rate_gui.py
+
+3. Delete __pycache__ folder
+
+4. Restart RateEdge
+
+================================================================================
+WHAT YOU'LL SEE:
+================================================================================
+
+OIS Rates → Medium Term (3Y+) → Table View:
+
+Date        Cur  3Y   4Y   5Y   7Y   10Y  12Y  15Y  20Y  30Y  35Y  40Y
+2025-11-14  AUD  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...
+
+All 11 tenors now showing!
+
+================================================================================
+FILE SIZE: 189 KB (4,111 lines)
+================================================================================
