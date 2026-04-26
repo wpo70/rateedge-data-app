@@ -114,8 +114,8 @@ def get_available_currencies():
     return ["AUD", "NZD", "USD"]
 
 @st.cache_data(ttl=300)
-def get_rate_history(currency: str, tenor: str, floating_rate: str, days: int = 90):
-    """Get historical rates for charting"""
+def get_rate_history(currency: str, tenor: str, floating_rate: str, days: int = 1825):
+    """Get historical rates for charting - default 5 years"""
     query = """
         SELECT date, rate
         FROM swap_rates
@@ -153,17 +153,22 @@ def render_rate_table(df: pd.DataFrame, title: str):
     st.subheader(title)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 90):
-    """Render historical rate chart"""
+def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 1825):
+    """Render historical rate chart - default 5 years"""
     df = get_rate_history(currency, tenor, floating_rate, days)
     
     if df.empty:
         st.info("No historical data available")
         return
     
+    # Display name for floating rate
+    display_name = floating_rate
+    if currency == "AUD" and floating_rate == "AONIA":
+        display_name = "OIS"
+    
     fig = px.line(
         df, x='date', y='rate',
-        title=f"{currency} {tenor} {floating_rate} Rate History",
+        title=f"{currency} {tenor} {display_name} Rate History",
         labels={'date': 'Date', 'rate': 'Rate (%)'}
     )
     fig.update_layout(
@@ -185,25 +190,35 @@ def render_curve(currency: str):
     # Get unique floating rates
     floating_rates = df['floating_rate'].unique()
     
-    # Tenor ordering
-    tenor_order = ['1M', '2M', '3M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
-                   '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y']
+    # Tenor ordering with proper labels
+    tenor_order = ['1W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
+                   '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
     
     fig = go.Figure()
     
     for fr in floating_rates:
         subset = df[df['floating_rate'] == fr].copy()
-        # Sort by tenor
-        subset['tenor_order'] = subset['tenor'].apply(
-            lambda x: tenor_order.index(x) if x in tenor_order else 99
-        )
+        
+        # Rename AONIA to OIS for AUD
+        display_name = fr
+        if currency == "AUD" and fr == "AONIA":
+            display_name = "OIS"
+        
+        # Sort by tenor order (case insensitive)
+        def get_tenor_order(t):
+            t_upper = t.upper() if isinstance(t, str) else str(t).upper()
+            if t_upper in tenor_order:
+                return tenor_order.index(t_upper)
+            return 99
+        
+        subset['tenor_order'] = subset['tenor'].apply(get_tenor_order)
         subset = subset.sort_values('tenor_order')
         
         fig.add_trace(go.Scatter(
             x=subset['tenor'],
             y=subset['rate'],
             mode='lines+markers',
-            name=fr
+            name=display_name
         ))
     
     fig.update_layout(
@@ -211,7 +226,8 @@ def render_curve(currency: str):
         xaxis_title="Tenor",
         yaxis_title="Rate (%)",
         hovermode='x unified',
-        height=450
+        height=450,
+        xaxis=dict(type='category')  # Force categorical x-axis for proper tenor labels
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -237,7 +253,7 @@ def page_dashboard():
             df = get_latest_rates(ccy)
             if not df.empty:
                 # Get 5Y rate as headline
-                rate_5y = df[df['tenor'] == '5Y']
+                rate_5y = df[df['tenor'].str.upper() == '5Y']
                 if not rate_5y.empty:
                     rate = rate_5y.iloc[0]['rate']
                     st.metric(f"{ccy} 5Y", f"{rate:.3f}%")
@@ -269,7 +285,8 @@ def page_swap_rates():
     with col1:
         currency = st.selectbox("Currency", currencies)
     with col2:
-        days = st.selectbox("Period", [7, 14, 30, 60, 90, 180, 365], index=2)
+        days = st.selectbox("Period", [7, 14, 30, 60, 90, 180, 365, 730, 1825], index=4, 
+                           format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
     with col3:
         st.write("")  # Spacer
     
@@ -289,6 +306,9 @@ def page_swap_rates():
     if currency != "All":
         latest = get_latest_rates(currency)
         if not latest.empty:
+            # Rename AONIA to OIS for AUD
+            if currency == "AUD":
+                latest['floating_rate'] = latest['floating_rate'].replace('AONIA', 'OIS')
             pivot = latest.pivot_table(
                 index='tenor', 
                 columns='floating_rate', 
@@ -301,6 +321,9 @@ def page_swap_rates():
             with st.expander(f"🔹 {ccy}", expanded=True):
                 latest = get_latest_rates(ccy)
                 if not latest.empty:
+                    # Rename AONIA to OIS for AUD
+                    if ccy == "AUD":
+                        latest['floating_rate'] = latest['floating_rate'].replace('AONIA', 'OIS')
                     pivot = latest.pivot_table(
                         index='tenor', 
                         columns='floating_rate', 
@@ -334,7 +357,8 @@ def page_benchmark_rates():
     with col1:
         currency = st.selectbox("Currency", currencies, key="bench_ccy")
     with col2:
-        days = st.selectbox("Period", [7, 14, 30, 60, 90, 180, 365], index=2, key="bench_days")
+        days = st.selectbox("Period", [7, 14, 30, 60, 90, 180, 365, 730, 1825], index=4, key="bench_days",
+                           format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
     
     # Fetch data
     df = get_benchmark_rates(currency if currency != "All" else None, days)
@@ -374,12 +398,23 @@ def page_charts():
     tenors = df['tenor'].unique().tolist() if not df.empty else ['5Y']
     floating_rates = df['floating_rate'].unique().tolist() if not df.empty else ['3M BBSW']
     
+    # Rename AONIA to OIS for display
+    display_floating_rates = []
+    for fr in floating_rates:
+        if currency == "AUD" and fr == "AONIA":
+            display_floating_rates.append("OIS")
+        else:
+            display_floating_rates.append(fr)
+    
     with col2:
         tenor = st.selectbox("Tenor", tenors, key="chart_tenor")
     with col3:
-        floating_rate = st.selectbox("Floating Rate", floating_rates, key="chart_float")
+        fr_display = st.selectbox("Floating Rate", display_floating_rates, key="chart_float")
+        # Map back to actual value
+        floating_rate = floating_rates[display_floating_rates.index(fr_display)]
     with col4:
-        days = st.selectbox("Period", [30, 60, 90, 180, 365], index=2, key="chart_days")
+        days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_days",
+                           format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
     
     render_rate_chart(currency, tenor, floating_rate, days)
 
@@ -416,7 +451,7 @@ def page_about():
 def main():
     # Sidebar navigation
     with st.sidebar:
-        st.image("https://rateedge.au/logo.png", width=200)
+        st.markdown("### 📊 RateEdge Data")
         st.markdown("---")
         
         page = st.radio(
@@ -426,7 +461,7 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.0")
+        st.caption("RateEdge Data Portal v1.1")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
