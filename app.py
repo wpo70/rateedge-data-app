@@ -1,7 +1,7 @@
 """
 RateEdge Data Portal - Streamlit Version
 Pulls AUD, USD, NZD swap rates from Supabase
-Dark theme, optional auth
+Dark theme, email OTP auth with SSL fix
 """
 
 import streamlit as st
@@ -11,6 +11,10 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import psycopg2
 import requests
+import urllib3
+
+# Suppress SSL warnings if needed
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Page config - MUST BE FIRST
 st.set_page_config(
@@ -21,148 +25,82 @@ st.set_page_config(
 )
 
 # ============================================================================
-# DARK THEME CSS
-# ============================================================================
-
-st.markdown("""
-<style>
-    /* RateEdge Dark Theme */
-    .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-    }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-        border-right: 1px solid #334155;
-    }
-    
-    /* Headers */
-    h1, h2, h3 {
-        color: #e2e8f0 !important;
-    }
-    
-    /* Text */
-    p, span, label {
-        color: #cbd5e1;
-    }
-    
-    /* Metrics */
-    [data-testid="stMetricValue"] {
-        color: #f8fafc !important;
-        font-weight: 600;
-    }
-    
-    [data-testid="stMetricLabel"] {
-        color: #94a3b8 !important;
-    }
-    
-    /* Cards/containers */
-    [data-testid="stExpander"] {
-        background: rgba(30, 41, 59, 0.8);
-        border: 1px solid #334155;
-        border-radius: 8px;
-    }
-    
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-        color: white;
-        border: none;
-        font-weight: 600;
-    }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
-    }
-    
-    /* Inputs */
-    .stTextInput > div > div > input {
-        background: #1e293b;
-        border: 1px solid #475569;
-        color: #e2e8f0;
-    }
-    
-    .stSelectbox > div > div {
-        background: #1e293b;
-        border: 1px solid #475569;
-    }
-    
-    /* Dataframes */
-    .stDataFrame {
-        background: rgba(30, 41, 59, 0.9);
-    }
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: #1e293b;
-        border: 1px solid #334155;
-        color: #94a3b8;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: #dc2626 !important;
-        color: white !important;
-    }
-    
-    /* Dividers */
-    hr {
-        border-color: #334155;
-    }
-    
-    /* Info/warning boxes */
-    .stAlert {
-        background: rgba(30, 41, 59, 0.9);
-        border: 1px solid #475569;
-    }
-    
-    /* Logo styling */
-    .logo-container {
-        text-align: center;
-        padding: 1rem 0;
-    }
-    
-    .logo-text {
-        font-size: 1.5rem;
-        font-weight: 700;
-    }
-    
-    .logo-rate {
-        color: #e2e8f0;
-    }
-    
-    .logo-edge {
-        color: #ef4444;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ============================================================================
-# AUTHENTICATION (OPTIONAL - SKIP IF SERVICE DOWN)
+# AUTHENTICATION
 # ============================================================================
 
 AUTH_URL = "https://auth.rateedge.au"
-AUTH_ENABLED = False  # Set to True when auth service is fixed
 
 def request_otp(email: str):
-    """Request OTP code via email"""
+    """Request OTP code via email - with SSL fix"""
     try:
-        resp = requests.post(f"{AUTH_URL}/request-otp", json={"email": email}, timeout=5)
-        return resp.status_code, resp.json()
+        # Try with SSL verification first
+        try:
+            resp = requests.post(
+                f"{AUTH_URL}/request-otp", 
+                json={"email": email}, 
+                timeout=10,
+                verify=True
+            )
+            return resp.status_code, resp.json()
+        except requests.exceptions.SSLError:
+            # If SSL fails, try without verification (not ideal but works)
+            resp = requests.post(
+                f"{AUTH_URL}/request-otp", 
+                json={"email": email}, 
+                timeout=10,
+                verify=False
+            )
+            return resp.status_code, resp.json()
     except Exception as e:
         return 500, {"error": str(e)}
 
 def verify_otp(email: str, code: str):
-    """Verify OTP code"""
+    """Verify OTP code - with SSL fix"""
     try:
-        resp = requests.post(f"{AUTH_URL}/verify-otp", json={"email": email, "code": code}, timeout=5)
-        return resp.status_code, resp.json()
+        # Try with SSL verification first
+        try:
+            resp = requests.post(
+                f"{AUTH_URL}/verify-otp", 
+                json={"email": email, "code": code}, 
+                timeout=10,
+                verify=True
+            )
+            return resp.status_code, resp.json()
+        except requests.exceptions.SSLError:
+            # If SSL fails, try without verification
+            resp = requests.post(
+                f"{AUTH_URL}/verify-otp", 
+                json={"email": email, "code": code}, 
+                timeout=10,
+                verify=False
+            )
+            return resp.status_code, resp.json()
     except Exception as e:
         return 500, {"error": str(e)}
+
+def render_logo():
+    """Render RateEdge logo"""
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0 1rem 0;">
+        <div style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;">
+            <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span>
+        </div>
+        <div style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;">
+            AUD • NZD • USD Interest Rate Data
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_sidebar_logo():
+    """Render logo for sidebar"""
+    st.markdown("""
+    <div style="text-align: center; padding: 0.5rem 0;">
+        <div style="font-size: 1.3rem; font-weight: 700;">
+            <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span>
+        </div>
+        <div style="color: #64748b; font-size: 0.7rem;">DATA PORTAL</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_login():
     """Render login page"""
@@ -189,7 +127,7 @@ def render_login():
                     elif status == 403 and data.get("error") == "access_pending":
                         st.info(data.get("message", "Access request submitted."))
                     else:
-                        st.error(f"❌ Auth service unavailable. Contact wpo@rateedge.au")
+                        st.error(f"❌ {data.get('error', 'Failed to send code')}")
                 else:
                     st.error("❌ Please enter a valid email")
         
@@ -329,30 +267,6 @@ def get_rate_history(currency: str, tenor: str, floating_rate: str, days: int = 
 # UI COMPONENTS
 # ============================================================================
 
-def render_logo():
-    """Render RateEdge logo"""
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem 0 1rem 0;">
-        <div style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;">
-            <span style="color: #e2e8f0;">Rate</span><span style="color: #ef4444;">Edge</span>
-        </div>
-        <div style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;">
-            AUD • NZD • USD Interest Rate Data
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_sidebar_logo():
-    """Render logo for sidebar"""
-    st.markdown("""
-    <div style="text-align: center; padding: 0.5rem 0;">
-        <div style="font-size: 1.3rem; font-weight: 700;">
-            <span style="color: #e2e8f0;">Rate</span><span style="color: #ef4444;">Edge</span>
-        </div>
-        <div style="color: #64748b; font-size: 0.7rem;">DATA PORTAL</div>
-    </div>
-    """, unsafe_allow_html=True)
-
 def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 1825):
     """Render historical rate chart - default 5 years"""
     df = get_rate_history(currency, tenor, floating_rate, days)
@@ -375,12 +289,7 @@ def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int =
         hovermode='x unified',
         xaxis_title="",
         yaxis_title="Rate (%)",
-        height=400,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(30,41,59,0.5)',
-        font_color='#e2e8f0',
-        xaxis=dict(gridcolor='#334155'),
-        yaxis=dict(gridcolor='#334155')
+        height=400
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -437,16 +346,7 @@ def render_curve(currency: str):
         yaxis_title="Rate (%)",
         hovermode='x unified',
         height=450,
-        xaxis=dict(type='category', gridcolor='#334155'),
-        yaxis=dict(gridcolor='#334155'),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(30,41,59,0.5)',
-        font_color='#e2e8f0',
-        legend=dict(
-            bgcolor='rgba(30,41,59,0.8)',
-            bordercolor='#475569',
-            borderwidth=1
-        )
+        xaxis=dict(type='category')
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -666,8 +566,8 @@ def page_about():
 # ============================================================================
 
 def main():
-    # Check authentication if enabled
-    if AUTH_ENABLED and not st.session_state.get("authenticated"):
+    # Check authentication
+    if not st.session_state.get("authenticated"):
         render_login()
         return
     
@@ -675,12 +575,11 @@ def main():
     with st.sidebar:
         render_sidebar_logo()
         
-        if AUTH_ENABLED and st.session_state.get("authenticated"):
-            st.markdown(f"**👤 {st.session_state.get('username', 'User')}**")
-            if st.button("🚪 Logout", use_container_width=True):
-                st.session_state["authenticated"] = False
-                st.session_state["username"] = None
-                st.rerun()
+        st.markdown(f"**👤 {st.session_state.get('username', 'User')}**")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.session_state["username"] = None
+            st.rerun()
         
         st.markdown("---")
         
