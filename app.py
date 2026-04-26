@@ -1,7 +1,7 @@
 """
 RateEdge Data Portal - Streamlit Version
 Pulls AUD, USD, NZD swap rates from Supabase
-With Email OTP Authentication
+Dark theme, optional auth
 """
 
 import streamlit as st
@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import psycopg2
 import requests
 
-# Page config
+# Page config - MUST BE FIRST
 st.set_page_config(
     page_title="RateEdge Data",
     page_icon="📊",
@@ -21,15 +21,137 @@ st.set_page_config(
 )
 
 # ============================================================================
-# AUTHENTICATION
+# DARK THEME CSS
+# ============================================================================
+
+st.markdown("""
+<style>
+    /* RateEdge Dark Theme */
+    .stApp {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        border-right: 1px solid #334155;
+    }
+    
+    /* Headers */
+    h1, h2, h3 {
+        color: #e2e8f0 !important;
+    }
+    
+    /* Text */
+    p, span, label {
+        color: #cbd5e1;
+    }
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        color: #f8fafc !important;
+        font-weight: 600;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+    }
+    
+    /* Cards/containers */
+    [data-testid="stExpander"] {
+        background: rgba(30, 41, 59, 0.8);
+        border: 1px solid #334155;
+        border-radius: 8px;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+        color: white;
+        border: none;
+        font-weight: 600;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+    }
+    
+    /* Inputs */
+    .stTextInput > div > div > input {
+        background: #1e293b;
+        border: 1px solid #475569;
+        color: #e2e8f0;
+    }
+    
+    .stSelectbox > div > div {
+        background: #1e293b;
+        border: 1px solid #475569;
+    }
+    
+    /* Dataframes */
+    .stDataFrame {
+        background: rgba(30, 41, 59, 0.9);
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: #1e293b;
+        border: 1px solid #334155;
+        color: #94a3b8;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: #dc2626 !important;
+        color: white !important;
+    }
+    
+    /* Dividers */
+    hr {
+        border-color: #334155;
+    }
+    
+    /* Info/warning boxes */
+    .stAlert {
+        background: rgba(30, 41, 59, 0.9);
+        border: 1px solid #475569;
+    }
+    
+    /* Logo styling */
+    .logo-container {
+        text-align: center;
+        padding: 1rem 0;
+    }
+    
+    .logo-text {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    
+    .logo-rate {
+        color: #e2e8f0;
+    }
+    
+    .logo-edge {
+        color: #ef4444;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================================
+# AUTHENTICATION (OPTIONAL - SKIP IF SERVICE DOWN)
 # ============================================================================
 
 AUTH_URL = "https://auth.rateedge.au"
+AUTH_ENABLED = False  # Set to True when auth service is fixed
 
 def request_otp(email: str):
     """Request OTP code via email"""
     try:
-        resp = requests.post(f"{AUTH_URL}/request-otp", json={"email": email}, timeout=10)
+        resp = requests.post(f"{AUTH_URL}/request-otp", json={"email": email}, timeout=5)
         return resp.status_code, resp.json()
     except Exception as e:
         return 500, {"error": str(e)}
@@ -37,23 +159,14 @@ def request_otp(email: str):
 def verify_otp(email: str, code: str):
     """Verify OTP code"""
     try:
-        resp = requests.post(f"{AUTH_URL}/verify-otp", json={"email": email, "code": code}, timeout=10)
+        resp = requests.post(f"{AUTH_URL}/verify-otp", json={"email": email, "code": code}, timeout=5)
         return resp.status_code, resp.json()
     except Exception as e:
         return 500, {"error": str(e)}
 
 def render_login():
     """Render login page"""
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem;">
-        <h1 style="margin: 0;">
-            <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span> Data
-        </h1>
-        <p style="color: #64748b; margin-top: 0.5rem;">
-            AUD • NZD • USD Interest Rate Data
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    render_logo()
     
     st.markdown("---")
     st.markdown("### 🔐 Login with Email")
@@ -76,7 +189,7 @@ def render_login():
                     elif status == 403 and data.get("error") == "access_pending":
                         st.info(data.get("message", "Access request submitted."))
                     else:
-                        st.error(f"❌ {data.get('error', 'Failed to send code')}")
+                        st.error(f"❌ Auth service unavailable. Contact wpo@rateedge.au")
                 else:
                     st.error("❌ Please enter a valid email")
         
@@ -193,7 +306,7 @@ def get_latest_rates(currency: str):
 
 @st.cache_data(ttl=300)
 def get_available_currencies():
-    """Get list of available currencies"""
+    """Get list of available currencies from database"""
     query = "SELECT DISTINCT currency FROM swap_rates ORDER BY currency"
     df = run_query(query)
     if not df.empty:
@@ -216,20 +329,29 @@ def get_rate_history(currency: str, tenor: str, floating_rate: str, days: int = 
 # UI COMPONENTS
 # ============================================================================
 
-def render_header():
-    """Render header"""
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="margin: 0;">
-                <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span> Data
-            </h1>
-            <p style="color: #64748b; margin-top: 0.5rem;">
-                AUD • NZD • USD Interest Rate Data
-            </p>
+def render_logo():
+    """Render RateEdge logo"""
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0 1rem 0;">
+        <div style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;">
+            <span style="color: #e2e8f0;">Rate</span><span style="color: #ef4444;">Edge</span>
         </div>
-        """, unsafe_allow_html=True)
+        <div style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;">
+            AUD • NZD • USD Interest Rate Data
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_sidebar_logo():
+    """Render logo for sidebar"""
+    st.markdown("""
+    <div style="text-align: center; padding: 0.5rem 0;">
+        <div style="font-size: 1.3rem; font-weight: 700;">
+            <span style="color: #e2e8f0;">Rate</span><span style="color: #ef4444;">Edge</span>
+        </div>
+        <div style="color: #64748b; font-size: 0.7rem;">DATA PORTAL</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 1825):
     """Render historical rate chart - default 5 years"""
@@ -253,7 +375,12 @@ def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int =
         hovermode='x unified',
         xaxis_title="",
         yaxis_title="Rate (%)",
-        height=400
+        height=400,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(30,41,59,0.5)',
+        font_color='#e2e8f0',
+        xaxis=dict(gridcolor='#334155'),
+        yaxis=dict(gridcolor='#334155')
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -272,9 +399,12 @@ def render_curve(currency: str):
     tenor_order = ['1W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
                    '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
     
+    # Colors for lines
+    colors = ['#3b82f6', '#06b6d4', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6']
+    
     fig = go.Figure()
     
-    for fr in floating_rates:
+    for idx, fr in enumerate(floating_rates):
         subset = df[df['floating_rate'] == fr].copy()
         
         # Rename AONIA to OIS for AUD
@@ -296,7 +426,9 @@ def render_curve(currency: str):
             x=subset['tenor'],
             y=subset['rate'],
             mode='lines+markers',
-            name=display_name
+            name=display_name,
+            line=dict(color=colors[idx % len(colors)], width=2),
+            marker=dict(size=6)
         ))
     
     fig.update_layout(
@@ -305,7 +437,16 @@ def render_curve(currency: str):
         yaxis_title="Rate (%)",
         hovermode='x unified',
         height=450,
-        xaxis=dict(type='category')  # Force categorical x-axis for proper tenor labels
+        xaxis=dict(type='category', gridcolor='#334155'),
+        yaxis=dict(gridcolor='#334155'),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(30,41,59,0.5)',
+        font_color='#e2e8f0',
+        legend=dict(
+            bgcolor='rgba(30,41,59,0.8)',
+            bordercolor='#475569',
+            borderwidth=1
+        )
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -316,9 +457,9 @@ def render_curve(currency: str):
 
 def page_dashboard():
     """Dashboard page"""
-    render_header()
+    render_logo()
     
-    # Get currencies
+    # Get currencies from database
     currencies = get_available_currencies()
     
     # Summary metrics
@@ -336,7 +477,7 @@ def page_dashboard():
                     rate = rate_5y.iloc[0]['rate']
                     st.metric(f"{ccy} 5Y", f"{rate:.3f}%")
                 else:
-                    st.metric(f"{ccy}", "No data")
+                    st.metric(f"{ccy}", "No 5Y data")
             else:
                 st.metric(f"{ccy}", "No data")
     
@@ -355,10 +496,12 @@ def page_swap_rates():
     """Swap rates page"""
     st.header("📊 Swap Rates")
     
+    # Get currencies from database
+    db_currencies = get_available_currencies()
+    currencies = ["All"] + db_currencies
+    
     # Filters
     col1, col2, col3 = st.columns(3)
-    
-    currencies = ["All"] + get_available_currencies()
     
     with col1:
         currency = st.selectbox("Currency", currencies)
@@ -395,7 +538,7 @@ def page_swap_rates():
             )
             st.dataframe(pivot, use_container_width=True)
     else:
-        for ccy in get_available_currencies():
+        for ccy in db_currencies:
             with st.expander(f"🔹 {ccy}", expanded=True):
                 latest = get_latest_rates(ccy)
                 if not latest.empty:
@@ -427,10 +570,12 @@ def page_benchmark_rates():
     """Benchmark rates page"""
     st.header("📈 Benchmark Rates")
     
+    # Get currencies from database
+    db_currencies = get_available_currencies()
+    currencies = ["All"] + db_currencies
+    
     # Filters
     col1, col2 = st.columns(2)
-    
-    currencies = ["All"] + get_available_currencies()
     
     with col1:
         currency = st.selectbox("Currency", currencies, key="bench_ccy")
@@ -464,6 +609,7 @@ def page_charts():
     """Historical charts page"""
     st.header("📉 Historical Charts")
     
+    # Get currencies from database
     currencies = get_available_currencies()
     
     col1, col2, col3, col4 = st.columns(4)
@@ -503,15 +649,8 @@ def page_about():
     st.markdown("""
     ### RateEdge Data Portal
     
-    This portal provides access to interest rate swap data for:
-    - 🇦🇺 **AUD** - Australian Dollar
-    - 🇳🇿 **NZD** - New Zealand Dollar  
-    - 🇺🇸 **USD** - US Dollar
-    
-    #### Data Sources
-    - Bloomberg terminal exports
-    - DTCC SDR trade data
-    - Market data providers
+    This portal provides access to interest rate swap data for multiple currencies.
+    Data is sourced from Bloomberg terminal exports, DTCC SDR trade data, and market data providers.
     
     #### Contact
     - Email: wpo@rateedge.au
@@ -527,18 +666,21 @@ def page_about():
 # ============================================================================
 
 def main():
-    # Check authentication
-    if not st.session_state.get("authenticated"):
+    # Check authentication if enabled
+    if AUTH_ENABLED and not st.session_state.get("authenticated"):
         render_login()
         return
     
     # Sidebar navigation
     with st.sidebar:
-        st.markdown(f"**👤 {st.session_state.get('username', 'User')}**")
-        if st.button("🚪 Logout", use_container_width=True):
-            st.session_state["authenticated"] = False
-            st.session_state["username"] = None
-            st.rerun()
+        render_sidebar_logo()
+        
+        if AUTH_ENABLED and st.session_state.get("authenticated"):
+            st.markdown(f"**👤 {st.session_state.get('username', 'User')}**")
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state["authenticated"] = False
+                st.session_state["username"] = None
+                st.rerun()
         
         st.markdown("---")
         
@@ -549,7 +691,7 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.2")
+        st.caption("RateEdge Data Portal v1.3")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
