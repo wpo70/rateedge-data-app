@@ -1,6 +1,7 @@
 """
 RateEdge Data Portal - Streamlit Version
 Pulls AUD, USD, NZD swap rates from Supabase
+With Email OTP Authentication
 """
 
 import streamlit as st
@@ -9,7 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import psycopg2
-from psycopg2.extras import RealDictCursor
+import requests
 
 # Page config
 st.set_page_config(
@@ -18,6 +19,92 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+
+AUTH_URL = "https://auth.rateedge.au"
+
+def request_otp(email: str):
+    """Request OTP code via email"""
+    try:
+        resp = requests.post(f"{AUTH_URL}/request-otp", json={"email": email}, timeout=10)
+        return resp.status_code, resp.json()
+    except Exception as e:
+        return 500, {"error": str(e)}
+
+def verify_otp(email: str, code: str):
+    """Verify OTP code"""
+    try:
+        resp = requests.post(f"{AUTH_URL}/verify-otp", json={"email": email, "code": code}, timeout=10)
+        return resp.status_code, resp.json()
+    except Exception as e:
+        return 500, {"error": str(e)}
+
+def render_login():
+    """Render login page"""
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem;">
+        <h1 style="margin: 0;">
+            <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span> Data
+        </h1>
+        <p style="color: #64748b; margin-top: 0.5rem;">
+            AUD • NZD • USD Interest Rate Data
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.markdown("### 🔐 Login with Email")
+    
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_m:
+        if 'auth_step' not in st.session_state:
+            st.session_state.auth_step = 'email'
+        
+        if st.session_state.auth_step == 'email':
+            email = st.text_input("Email address", key="login_email", placeholder="your.email@company.com")
+            if st.button("📧 Send Verification Code", key="send_btn", use_container_width=True, type="primary"):
+                if email and '@' in email:
+                    status, data = request_otp(email)
+                    if status == 200:
+                        st.session_state.auth_step = 'otp'
+                        st.session_state.auth_email = email
+                        st.success("✅ Code sent!")
+                        st.rerun()
+                    elif status == 403 and data.get("error") == "access_pending":
+                        st.info(data.get("message", "Access request submitted."))
+                    else:
+                        st.error(f"❌ {data.get('error', 'Failed to send code')}")
+                else:
+                    st.error("❌ Please enter a valid email")
+        
+        elif st.session_state.auth_step == 'otp':
+            email = st.session_state.get('auth_email', '')
+            st.info(f"📧 Code sent to: **{email}**")
+            code = st.text_input("Enter 6-digit code", key="otp_code", max_chars=6)
+            
+            if st.button("✅ Verify", key="verify_btn", use_container_width=True, type="primary"):
+                if code and len(code) == 6:
+                    status, data = verify_otp(email, code)
+                    if status == 200:
+                        st.session_state["authenticated"] = True
+                        st.session_state["username"] = email
+                        st.session_state.auth_step = 'email'
+                        st.success("✅ Login successful!")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {data.get('error', 'Invalid code')}")
+                else:
+                    st.error("❌ Please enter the 6-digit code")
+            
+            if st.button("← Back", key="back_btn"):
+                st.session_state.auth_step = 'email'
+                st.rerun()
+    
+    st.markdown("---")
+    st.caption("Contact wpo@rateedge.au to request access")
 
 # ============================================================================
 # DATABASE CONNECTION
@@ -143,15 +230,6 @@ def render_header():
             </p>
         </div>
         """, unsafe_allow_html=True)
-
-def render_rate_table(df: pd.DataFrame, title: str):
-    """Render a rate table"""
-    if df.empty:
-        st.info(f"No {title} data available")
-        return
-    
-    st.subheader(title)
-    st.dataframe(df, use_container_width=True, hide_index=True)
 
 def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 1825):
     """Render historical rate chart - default 5 years"""
@@ -449,9 +527,19 @@ def page_about():
 # ============================================================================
 
 def main():
+    # Check authentication
+    if not st.session_state.get("authenticated"):
+        render_login()
+        return
+    
     # Sidebar navigation
     with st.sidebar:
-        st.markdown("### 📊 RateEdge Data")
+        st.markdown(f"**👤 {st.session_state.get('username', 'User')}**")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.session_state["username"] = None
+            st.rerun()
+        
         st.markdown("---")
         
         page = st.radio(
@@ -461,7 +549,7 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.1")
+        st.caption("RateEdge Data Portal v1.2")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
