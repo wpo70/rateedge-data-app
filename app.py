@@ -31,50 +31,28 @@ st.set_page_config(
 AUTH_URL = "https://auth.rateedge.au"
 
 def request_otp(email: str):
-    """Request OTP code via email - with SSL fix"""
+    """Request OTP code via email"""
     try:
-        # Try with SSL verification first
-        try:
-            resp = requests.post(
-                f"{AUTH_URL}/request-otp", 
-                json={"email": email}, 
-                timeout=10,
-                verify=True
-            )
-            return resp.status_code, resp.json()
-        except requests.exceptions.SSLError:
-            # If SSL fails, try without verification (not ideal but works)
-            resp = requests.post(
-                f"{AUTH_URL}/request-otp", 
-                json={"email": email}, 
-                timeout=10,
-                verify=False
-            )
-            return resp.status_code, resp.json()
+        resp = requests.post(
+            f"{AUTH_URL}/request-otp", 
+            json={"email": email}, 
+            timeout=10,
+            verify=False  # Skip SSL verification - Streamlit Cloud TLS issue
+        )
+        return resp.status_code, resp.json()
     except Exception as e:
         return 500, {"error": str(e)}
 
 def verify_otp(email: str, code: str):
-    """Verify OTP code - with SSL fix"""
+    """Verify OTP code"""
     try:
-        # Try with SSL verification first
-        try:
-            resp = requests.post(
-                f"{AUTH_URL}/verify-otp", 
-                json={"email": email, "code": code}, 
-                timeout=10,
-                verify=True
-            )
-            return resp.status_code, resp.json()
-        except requests.exceptions.SSLError:
-            # If SSL fails, try without verification
-            resp = requests.post(
-                f"{AUTH_URL}/verify-otp", 
-                json={"email": email, "code": code}, 
-                timeout=10,
-                verify=False
-            )
-            return resp.status_code, resp.json()
+        resp = requests.post(
+            f"{AUTH_URL}/verify-otp", 
+            json={"email": email, "code": code}, 
+            timeout=10,
+            verify=False  # Skip SSL verification - Streamlit Cloud TLS issue
+        )
+        return resp.status_code, resp.json()
     except Exception as e:
         return 500, {"error": str(e)}
 
