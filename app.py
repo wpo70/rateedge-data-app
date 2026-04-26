@@ -11,10 +11,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import psycopg2
 import requests
-import urllib3
-
-# Suppress SSL warnings if needed
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Page config - MUST BE FIRST
 st.set_page_config(
@@ -28,16 +24,16 @@ st.set_page_config(
 # AUTHENTICATION
 # ============================================================================
 
-AUTH_URL = "https://auth.rateedge.au"
+AUTH_URL = "https://rateedge-auth.onrender.com/api/auth"
+SITE_ID = "data"
 
 def request_otp(email: str):
     """Request OTP code via email"""
     try:
         resp = requests.post(
             f"{AUTH_URL}/request-otp", 
-            json={"email": email}, 
-            timeout=10,
-            verify=False  # Skip SSL verification - Streamlit Cloud TLS issue
+            json={"email": email, "site": SITE_ID}, 
+            timeout=10
         )
         return resp.status_code, resp.json()
     except Exception as e:
@@ -48,9 +44,8 @@ def verify_otp(email: str, code: str):
     try:
         resp = requests.post(
             f"{AUTH_URL}/verify-otp", 
-            json={"email": email, "code": code}, 
-            timeout=10,
-            verify=False  # Skip SSL verification - Streamlit Cloud TLS issue
+            json={"email": email, "site": SITE_ID, "code": code}, 
+            timeout=10
         )
         return resp.status_code, resp.json()
     except Exception as e:
