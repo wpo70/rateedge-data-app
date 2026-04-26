@@ -281,31 +281,49 @@ def render_curve(currency: str):
     tenor_order = ['1W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
                    '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
     
+    # Filter to only include valid tenors (string format like 1M, 5Y etc)
+    valid_tenors = [t for t in tenor_order]
+    df_filtered = df[df['tenor'].str.upper().isin([t.upper() for t in tenor_order])].copy()
+    
+    if df_filtered.empty:
+        st.warning(f"No standard tenor data for {currency}")
+        return
+    
     # Colors for lines
     colors = ['#3b82f6', '#06b6d4', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6']
     
     fig = go.Figure()
     
+    # Collect all tenors used across all floating rates for x-axis ordering
+    all_tenors_used = set()
+    
     for idx, fr in enumerate(floating_rates):
-        subset = df[df['floating_rate'] == fr].copy()
+        subset = df_filtered[df_filtered['floating_rate'] == fr].copy()
+        
+        if subset.empty:
+            continue
         
         # Rename AONIA to OIS for AUD
         display_name = fr
         if currency == "AUD" and fr == "AONIA":
             display_name = "OIS"
         
-        # Sort by tenor order (case insensitive)
+        # Sort by tenor order
         def get_tenor_order(t):
             t_upper = t.upper() if isinstance(t, str) else str(t).upper()
-            if t_upper in tenor_order:
-                return tenor_order.index(t_upper)
+            if t_upper in [x.upper() for x in tenor_order]:
+                return [x.upper() for x in tenor_order].index(t_upper)
             return 99
         
         subset['tenor_order'] = subset['tenor'].apply(get_tenor_order)
         subset = subset.sort_values('tenor_order')
         
+        # Normalize tenor labels to uppercase
+        subset['tenor_label'] = subset['tenor'].str.upper()
+        all_tenors_used.update(subset['tenor_label'].tolist())
+        
         fig.add_trace(go.Scatter(
-            x=subset['tenor'],
+            x=subset['tenor_label'],
             y=subset['rate'],
             mode='lines+markers',
             name=display_name,
@@ -313,13 +331,20 @@ def render_curve(currency: str):
             marker=dict(size=6)
         ))
     
+    # Create ordered category list for x-axis
+    ordered_tenors = [t for t in tenor_order if t in all_tenors_used]
+    
     fig.update_layout(
         title=f"{currency} Swap Curve (Latest)",
         xaxis_title="Tenor",
         yaxis_title="Rate (%)",
         hovermode='x unified',
         height=450,
-        xaxis=dict(type='category')
+        xaxis=dict(
+            type='category',
+            categoryorder='array',
+            categoryarray=ordered_tenors
+        )
     )
     
     st.plotly_chart(fig, use_container_width=True)
