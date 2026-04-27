@@ -287,8 +287,9 @@ def render_curve(currency: str):
         st.warning(f"No standard tenor data for {currency}")
         return
     
-    # Colors for lines
-    colors = ['#3b82f6', '#06b6d4', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6']
+    # Colors for lines - distinct and visible
+    colors = ['#2563eb', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899']
+    # Blue, Green, Red, Orange, Purple, Pink
     
     fig = go.Figure()
     
