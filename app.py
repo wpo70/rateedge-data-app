@@ -758,6 +758,589 @@ def page_about():
     """)
 
 # ============================================================================
+# HISTORICALS — FWD IRS ANALYSIS
+# ============================================================================
+
+@st.cache_data(ttl=300, show_spinner="Loading swap rate history…")
+def load_swap_history(currency: str, floating_rate: str, years_back: int = 8) -> pd.DataFrame:
+    """Load historical swap rates as wide table (date × tenor)."""
+    query = """
+        SELECT date, tenor, rate FROM swap_rates
+        WHERE currency = %s AND floating_rate = %s
+          AND date >= CURRENT_DATE - INTERVAL '%s years'
+        ORDER BY date
+    """
+    df = run_query(query, [currency, floating_rate, years_back])
+    if df.empty:
+        return pd.DataFrame()
+    df["date"] = pd.to_datetime(df["date"])
+    df["rate"] = df["rate"].astype(float)
+    return df.pivot_table(index="date", columns="tenor", values="rate", aggfunc="last").sort_index()
+
+def page_historicals():
+    """FWD IRS Historical Analysis page"""
+    st.header("📈 FWD IRS Analysis")
+
+    # ── Currency selector ──
+    col_ccy, col_load, col_info = st.columns([1, 1, 2])
+    with col_ccy:
+        ccy = st.selectbox("Currency", ["AUD", "USD", "NZD"], key="hist_ccy")
+
+    # ── Define floating rates per currency ──
+    if ccy == "AUD":
+        fr_a, fr_b = "3M BBSW", "6M BBSW"
+        basis_label = "6v3"
+    elif ccy == "USD":
+        fr_a, fr_b = "SOFR", "FEDFUNDS"
+        basis_label = "SOFR-FF"
+    else:
+        fr_a, fr_b = "BKBM 3M", None
+        basis_label = None
+
+    with col_load:
+        if st.button("🔄 Load History", key="hist_load", type="primary", use_container_width=True):
+            load_swap_history.clear()
+            st.session_state["_hist_wa"] = load_swap_history(ccy, fr_a)
+            if fr_b:
+                st.session_state["_hist_wb"] = load_swap_history(ccy, fr_b)
+            else:
+                st.session_state["_hist_wb"] = pd.DataFrame()
+            if ccy == "AUD":
+                st.session_state["_hist_wois"] = load_swap_history(ccy, "AONIA")
+            else:
+                st.session_state["_hist_wois"] = pd.DataFrame()
+
+    _wa = st.session_state.get("_hist_wa", pd.DataFrame())
+    _wb = st.session_state.get("_hist_wb", pd.DataFrame())
+    _wois = st.session_state.get("_hist_wois", pd.DataFrame())
+
+    with col_info:
+        if _wa.empty:
+            st.info("Click **🔄 Load History** to populate charts.")
+        else:
+            _n = len(_wa)
+            _d0 = _wa.index.min().strftime("%d-%b-%Y") if _n else "?"
+            _d1 = _wa.index.max().strftime("%d-%b-%Y") if _n else "?"
+            st.success(f"✅ {ccy}: {_n} dates loaded ({_d0} → {_d1})")
+
+    # ── Helpers ──
+    _STANDARD_TENORS = [1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50]
+    _yr_tenors = sorted(list(set(
+        _STANDARD_TENORS +
+        [int(c[:-1]) for c in _wa.columns if c.endswith("Y") and c[:-1].isdigit()] +
+        ([int(c[:-1]) for c in _wb.columns if c.endswith("Y") and c[:-1].isdigit()] if not _wb.empty else [])
+    )))
+    _tn_opts = [f"{y}Y" for y in _yr_tenors]
+    _fwd_starts = [1,2,3,4,5,7,10,12,15,20]
+    _fwd_tenors = [1,2,3,5,7,10]
+    _sp_colors = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a855f7","#06b6d4","#f43f5e","#84cc16"]
+
+    def _conv_rate(tenor_y, conv="Market"):
+        """Return rate series for a given tenor using selected convention."""
+        t = f"{int(tenor_y)}Y" if tenor_y == int(tenor_y) else f"{round(tenor_y*12)}M"
+        if conv == f"Q/Q ({fr_a})" or (fr_b is None):
+            return _wa[t] if t in _wa.columns else None
+        elif conv == f"S/S ({fr_b})":
+            return _wb[t] if not _wb.empty and t in _wb.columns else None
+        else:  # Market
+            if ccy == "AUD":
+                return _wa[t] if tenor_y <= 3 and t in _wa.columns else (_wb[t] if not _wb.empty and t in _wb.columns else None)
+            else:
+                return _wa[t] if t in _wa.columns else None
+
+    def _fwd(wide, start_y, tenor_y):
+        """Fwd-fwd rate: (par(end)*end - par(start)*start) / tenor"""
+        end_y = start_y + tenor_y
+        s = f"{int(start_y)}Y" if start_y == int(start_y) else f"{round(start_y*12)}M"
+        e = f"{int(end_y)}Y" if end_y == int(end_y) else f"{round(end_y*12)}M"
+        if s not in wide.columns or e not in wide.columns:
+            return None
+        return (wide[e] * end_y - wide[s] * start_y) / tenor_y
+
+    def _fwd_conv(start_y, tenor_y, conv="Market"):
+        """Fwd-fwd rate using convention-appropriate curve."""
+        end_y = start_y + tenor_y
+        r_s = _conv_rate(start_y, conv)
+        r_e = _conv_rate(end_y, conv)
+        if r_s is None or r_e is None:
+            return None
+        return (r_e * end_y - r_s * start_y) / tenor_y
+
+    def _fig_layout(fig, cut, ylab):
+        fig.update_layout(
+            height=460, margin=dict(l=50,r=20,t=40,b=40),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.8)",
+            legend=dict(orientation="h", y=1.06, font=dict(color="#e2e8f0", size=12)),
+            yaxis_title=ylab,
+            xaxis=dict(gridcolor="#334155", color="#94a3b8", range=[cut, pd.Timestamp.now()]),
+            yaxis=dict(gridcolor="#334155", color="#94a3b8"),
+            font=dict(color="#94a3b8"),
+        )
+
+    def _add_series(fig, label, series, color, bands=False):
+        fig.add_trace(go.Scatter(x=series.index, y=series.values, mode="lines",
+            name=label, line=dict(color=color, width=1.8)))
+        if bands:
+            mu, sd = series.mean(), series.std()
+            fig.add_hline(y=mu, line=dict(color=color, dash="dash", width=1), opacity=0.5)
+            fig.add_hrect(y0=mu-sd, y1=mu+sd, fillcolor=color, opacity=0.06, line_width=0)
+        else:
+            fig.add_hline(y=series.mean(), line=dict(color=color, dash="dot", width=1), opacity=0.4)
+
+    def _chart_stats(series_dict, key, ylab="bp"):
+        """Hi/Lo/Mean/Std/Current stats box."""
+        if not series_dict:
+            return
+        _rows = []
+        for _name, _ser in series_dict.items():
+            _s = _ser.dropna()
+            if _s.empty:
+                continue
+            _rows.append({
+                "Series": _name,
+                "Hi": round(_s.max(), 4),
+                "Lo": round(_s.min(), 4),
+                "Mean": round(_s.mean(), 4),
+                "Std": round(_s.std(), 4),
+                "Current": round(_s.iloc[-1], 4),
+                "vs Mean": round(_s.iloc[-1] - _s.mean(), 4),
+            })
+        if _rows:
+            _sdf = pd.DataFrame(_rows).set_index("Series")
+            st.dataframe(_sdf.style.format("{:.4f}", na_rep="  —  "),
+                         use_container_width=True, height=min(38 + 38*len(_rows), 280))
+
+    # ── Convention selector (AUD only) ──
+    if ccy == "AUD" and (not _wa.empty or not _wb.empty):
+        _conv = st.radio("Rate Convention", [f"Market (≤3Y Q/Q, ≥4Y S/S)", f"Q/Q ({fr_a})", f"S/S ({fr_b})"],
+                         horizontal=True, key="hist_conv")
+        _conv_key = "Market" if "Market" in _conv else _conv
+    else:
+        _conv_key = "Market"
+
+    # ── Sub-tab navigation ──
+    if basis_label:
+        _tab_names = ["IRS Spreads", "IRS Butterflies", "Fwd-Fwd Rates",
+                      f"{basis_label} Outright", f"{basis_label} Fwd-Fwd",
+                      f"{basis_label} Spreads", f"{basis_label} Butterflies"]
+    else:
+        _tab_names = ["IRS Spreads", "IRS Butterflies", "Fwd-Fwd Rates"]
+
+    _active = st.session_state.get("_hist_active_tab", 0)
+    if _active >= len(_tab_names):
+        _active = 0
+    _cols = st.columns(len(_tab_names))
+    for _i, _name in enumerate(_tab_names):
+        with _cols[_i]:
+            if st.button(_name, key=f"_hist_tab_{_i}",
+                         type="primary" if _i == _active else "secondary",
+                         use_container_width=True):
+                st.session_state["_hist_active_tab"] = _i
+                st.rerun()
+    st.markdown("---")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 0: IRS SPREADS
+    # ════════════════════════════════════════════════════════════
+    if _active == 0:
+        st.markdown("#### IRS Curve Spreads")
+        if "hist_sp_list" not in st.session_state:
+            st.session_state["hist_sp_list"] = [("2Y","10Y"), ("5Y","30Y")]
+
+        bc1, bc2, bc3, bc4 = st.columns([1.2, 1.2, 0.8, 1.8])
+        with bc1:
+            _sp_l1 = st.selectbox("Leg 1 (short)", _tn_opts, index=_tn_opts.index("2Y") if "2Y" in _tn_opts else 0, key="hsp_l1")
+        with bc2:
+            _sp_l2 = st.selectbox("Leg 2 (long)", _tn_opts, index=_tn_opts.index("10Y") if "10Y" in _tn_opts else 4, key="hsp_l2")
+        with bc3:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("➕ Add", key="hsp_add", use_container_width=True):
+                if _sp_l1 != _sp_l2 and (_sp_l1, _sp_l2) not in st.session_state["hist_sp_list"]:
+                    st.session_state["hist_sp_list"].append((_sp_l1, _sp_l2))
+        with bc4:
+            rc1, rc2 = st.columns([3,1])
+            with rc1:
+                _sp_rm = st.selectbox("Remove", ["  —  "] + [f"{a} → {b}" for a,b in st.session_state["hist_sp_list"]], key="hsp_rm")
+            with rc2:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➖", key="hsp_rm_btn", use_container_width=True) and _sp_rm != "  —  ":
+                    _rp = _sp_rm.split(" → ")
+                    if len(_rp)==2 and (_rp[0],_rp[1]) in st.session_state["hist_sp_list"]:
+                        st.session_state["hist_sp_list"].remove((_rp[0],_rp[1]))
+
+        c1, c2, c3 = st.columns(3)
+        with c1: _sp_yr = st.slider("History (years)", 1, 8, 5, key="hsp_yr")
+        with c2: _sp_bands = st.checkbox("Mean ± 1σ bands", True, key="hsp_bands")
+        with c3: _sp_as_spread = st.checkbox("Show as spread", False, key="hsp_as_spread")
+
+        _cut = pd.Timestamp.now() - pd.DateOffset(years=_sp_yr)
+        _fig = go.Figure()
+        _sp_series = {}
+        for _a, _b in st.session_state["hist_sp_list"]:
+            try:
+                _ay = int(_a[:-1]); _by = int(_b[:-1])
+            except: continue
+            _ra = _conv_rate(_ay, _conv_key); _rb = _conv_rate(_by, _conv_key)
+            if _ra is None or _rb is None: continue
+            _sr = (_rb - _ra).dropna()
+            _sr = _sr[_sr.index >= _cut] * 100
+            if not _sr.empty:
+                _sp_series[f"{_a} → {_b}"] = _sr
+
+        if _sp_as_spread and len(_sp_series) >= 2:
+            _sk = list(_sp_series.keys())
+            _sc1, _sc2 = st.columns(2)
+            with _sc1: _s1 = st.selectbox("Series A", _sk, index=0, key="hsp_s1")
+            with _sc2: _s2 = st.selectbox("Series B (subtract)", [k for k in _sk if k != _s1], index=0, key="hsp_s2")
+            if _s1 in _sp_series and _s2 in _sp_series:
+                _cmb = (_sp_series[_s1] - _sp_series[_s2]).dropna()
+                _fig.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
+                    name=f"{_s1}  v  {_s2}", line=dict(color=_sp_colors[0], width=1.8)))
+                _fig.add_hline(y=_cmb.mean(), line=dict(color="#94a3b8", dash="dash", width=1))
+                _sp_active = {f"{_s1}  v  {_s2}": _cmb}
+            else:
+                _sp_active = _sp_series
+        else:
+            _sp_active = _sp_series
+            for _i, (_lbl, _sr) in enumerate(_sp_series.items()):
+                _add_series(_fig, _lbl, _sr, _sp_colors[_i % len(_sp_colors)], _sp_bands)
+
+        if _sp_series:
+            _fig_layout(_fig, _cut, "Spread (bp)")
+            st.plotly_chart(_fig, use_container_width=True)
+            _chart_stats(_sp_active, "sp", "bp")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 1: IRS BUTTERFLIES
+    # ════════════════════════════════════════════════════════════
+    if _active == 1:
+        st.markdown("#### IRS Rate Butterflies")
+        if "hist_fl_list" not in st.session_state:
+            st.session_state["hist_fl_list"] = [("2Y","5Y","10Y")]
+
+        bc1,bc2,bc3,bc4,bc5 = st.columns([1,1,1,0.7,1.5])
+        with bc1: _fl_w = st.selectbox("Wing 1", _tn_opts, index=_tn_opts.index("2Y") if "2Y" in _tn_opts else 0, key="hfl_w")
+        with bc2: _fl_m = st.selectbox("Body", _tn_opts, index=_tn_opts.index("5Y") if "5Y" in _tn_opts else 2, key="hfl_m")
+        with bc3: _fl_e = st.selectbox("Wing 2", _tn_opts, index=_tn_opts.index("10Y") if "10Y" in _tn_opts else 4, key="hfl_e")
+        with bc4:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("➕ Add", key="hfl_add", use_container_width=True):
+                if len({_fl_w,_fl_m,_fl_e})==3 and (_fl_w,_fl_m,_fl_e) not in st.session_state["hist_fl_list"]:
+                    st.session_state["hist_fl_list"].append((_fl_w,_fl_m,_fl_e))
+        with bc5:
+            rc1, rc2 = st.columns([3,1])
+            with rc1: _fl_rm = st.selectbox("Remove", ["  —  "]+[f"{w}/{m}/{e}" for w,m,e in st.session_state["hist_fl_list"]], key="hfl_rm")
+            with rc2:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➖", key="hfl_rm_btn", use_container_width=True) and _fl_rm != "  —  ":
+                    _rp = _fl_rm.split("/")
+                    if len(_rp)==3 and tuple(_rp) in st.session_state["hist_fl_list"]:
+                        st.session_state["hist_fl_list"].remove(tuple(_rp))
+
+        c1,c2 = st.columns(2)
+        with c1: _fl_yr = st.slider("History (years)",1,8,5,key="hfl_yr")
+        with c2: _fl_bands = st.checkbox("Mean ± 1σ bands", True, key="hfl_bands")
+
+        _cut_fl = pd.Timestamp.now() - pd.DateOffset(years=_fl_yr)
+        _fig_fl = go.Figure()
+        _fl_series = {}
+        for _fw,_fm,_fe in st.session_state["hist_fl_list"]:
+            try:
+                _wy=int(_fw[:-1]); _my=int(_fm[:-1]); _ey=int(_fe[:-1])
+            except: continue
+            _rw=_conv_rate(_wy,_conv_key); _rm=_conv_rate(_my,_conv_key); _re=_conv_rate(_ey,_conv_key)
+            if _rw is None or _rm is None or _re is None: continue
+            _fly = (_rm - 0.5*(_rw+_re)).dropna()
+            _fly = _fly[_fly.index>=_cut_fl]*100
+            if not _fly.empty:
+                _fl_series[f"{_fw}/{_fm}/{_fe}"] = _fly
+
+        for _i,(_l,_s) in enumerate(_fl_series.items()):
+            _add_series(_fig_fl, _l, _s, _sp_colors[_i%len(_sp_colors)], _fl_bands)
+        if _fl_series:
+            _fig_fl.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_layout(_fig_fl, _cut_fl, "Butterfly (bp)")
+            st.plotly_chart(_fig_fl, use_container_width=True)
+            _chart_stats(_fl_series, "fl", "bp")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 2: FWD-FWD RATES
+    # ════════════════════════════════════════════════════════════
+    if _active == 2:
+        st.markdown("#### Forward-Forward Swap Rates")
+        if "hist_fv_list" not in st.session_state:
+            st.session_state["hist_fv_list"] = [(2,2), (5,5)]
+
+        bc1,bc2,bc3,bc4 = st.columns([1,1,0.7,1.5])
+        with bc1: _fv_st = st.selectbox("Start (years)", _fwd_starts, index=_fwd_starts.index(2) if 2 in _fwd_starts else 0, key="hfv_st")
+        with bc2: _fv_tn = st.selectbox("Tenor (years)", _fwd_tenors, index=_fwd_tenors.index(2) if 2 in _fwd_tenors else 0, key="hfv_tn")
+        with bc3:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("➕ Add", key="hfv_add", use_container_width=True):
+                if (_fv_st, _fv_tn) not in st.session_state["hist_fv_list"]:
+                    st.session_state["hist_fv_list"].append((_fv_st, _fv_tn))
+        with bc4:
+            rc1, rc2 = st.columns([3,1])
+            with rc1: _fv_rm = st.selectbox("Remove", ["  —  "]+[f"{s}y{t}y" for s,t in st.session_state["hist_fv_list"]], key="hfv_rm")
+            with rc2:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➖", key="hfv_rm_btn", use_container_width=True) and _fv_rm != "  —  ":
+                    _rp = _fv_rm[:-1].split("y")
+                    if len(_rp)==2:
+                        try:
+                            if (int(_rp[0]),int(_rp[1])) in st.session_state["hist_fv_list"]:
+                                st.session_state["hist_fv_list"].remove((int(_rp[0]),int(_rp[1])))
+                        except: pass
+
+        c1,c2,c3 = st.columns(3)
+        with c1: _fv_yr = st.slider("History (years)",1,8,5,key="hfv_yr")
+        with c2: _fv_as_spread = st.checkbox("Show as spread", False, key="hfv_sprd")
+
+        _cut_fv = pd.Timestamp.now() - pd.DateOffset(years=_fv_yr)
+        _fig_fv = go.Figure()
+        _fv_series = {}
+        for _s,_t in st.session_state["hist_fv_list"]:
+            _r = _fwd_conv(_s,_t,_conv_key)
+            if _r is not None:
+                _rs = _r[_r.index>=_cut_fv].dropna()
+                if not _rs.empty:
+                    _fv_series[f"{_s}y{_t}y"] = _rs
+
+        if _fv_as_spread and len(_fv_series) >= 2:
+            _fk = list(_fv_series.keys())
+            _vc1, _vc2 = st.columns(2)
+            with _vc1: _fv_s1 = st.selectbox("Series A", _fk, index=0, key="hfv_s1")
+            with _vc2: _fv_s2 = st.selectbox("Series B (subtract)", [k for k in _fk if k != _fv_s1], index=0, key="hfv_s2")
+            if _fv_s1 in _fv_series and _fv_s2 in _fv_series:
+                _cmb=(_fv_series[_fv_s1]-_fv_series[_fv_s2]).dropna()*100
+                _fig_fv.add_trace(go.Scatter(x=_cmb.index,y=_cmb.values,mode="lines",
+                    name=f"{_fv_s1} v {_fv_s2}",line=dict(color=_sp_colors[0],width=1.8)))
+                _fig_fv.add_hline(y=_cmb.mean(),line=dict(color="#94a3b8",dash="dash",width=1))
+                _fv_active = {f"{_fv_s1} v {_fv_s2}": _cmb}
+                _fig_layout(_fig_fv, _cut_fv, "Spread (bp)")
+            else:
+                _fv_active = _fv_series
+        else:
+            _fv_active = _fv_series
+            for _i,(_l,_s) in enumerate(_fv_series.items()):
+                _add_series(_fig_fv, _l, _s, _sp_colors[_i%len(_sp_colors)])
+            _fig_layout(_fig_fv, _cut_fv, "Rate (%)")
+        if _fv_series:
+            st.plotly_chart(_fig_fv, use_container_width=True)
+            _chart_stats(_fv_active, "fv", "%")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 3: BASIS OUTRIGHT
+    # ════════════════════════════════════════════════════════════
+    if _active == 3 and basis_label:
+        st.markdown(f"#### {basis_label} Basis — Outright ({fr_b} → {fr_a})")
+        _com = sorted([c for c in _wb.columns if c in _wa.columns and c.endswith("Y")],
+                       key=lambda x: int(x[:-1])) if not _wb.empty else []
+        if not _com:
+            st.info(f"No overlapping tenors between {fr_a} and {fr_b}.")
+        else:
+            if "hist_b_list" not in st.session_state:
+                st.session_state["hist_b_list"] = _com[:3] if len(_com) >= 3 else _com
+
+            bc1,bc2,bc3 = st.columns([1.5,0.7,1.5])
+            with bc1:
+                _avail = [t for t in _com if t not in st.session_state["hist_b_list"]] or _com
+                _b_add_tn = st.selectbox("Add tenor", _avail, key="hb_add_tn")
+            with bc2:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➕ Add", key="hb_add", use_container_width=True):
+                    if _b_add_tn not in st.session_state["hist_b_list"]:
+                        st.session_state["hist_b_list"].append(_b_add_tn)
+            with bc3:
+                rc1, rc2 = st.columns([3,1])
+                with rc1: _b_rm = st.selectbox("Remove", ["  —  "]+st.session_state["hist_b_list"], key="hb_rm")
+                with rc2:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("➖", key="hb_rm_btn", use_container_width=True) and _b_rm != "  —  " and _b_rm in st.session_state["hist_b_list"]:
+                        st.session_state["hist_b_list"].remove(_b_rm)
+
+            c1,c2 = st.columns(2)
+            with c1: _b_yr = st.slider("History (years)",1,8,5,key="hb_yr")
+            _cut_b = pd.Timestamp.now() - pd.DateOffset(years=_b_yr)
+            _fig_b = go.Figure()
+            _b_series = {}
+            for _i,_tn in enumerate(st.session_state["hist_b_list"]):
+                if _tn not in _wb.columns or _tn not in _wa.columns: continue
+                _bs = (_wb[_tn]-_wa[_tn]).dropna()
+                _bs = _bs[_bs.index>=_cut_b]*100
+                if not _bs.empty:
+                    _b_series[f"{_tn} {basis_label}"] = _bs
+                    _add_series(_fig_b, f"{_tn} {basis_label}", _bs, _sp_colors[_i%len(_sp_colors)])
+            _fig_b.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_layout(_fig_b, _cut_b, f"{basis_label} Basis (bp)")
+            if _b_series:
+                st.plotly_chart(_fig_b, use_container_width=True)
+                _chart_stats(_b_series, "b", "bp")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 4: BASIS FWD-FWD
+    # ════════════════════════════════════════════════════════════
+    if _active == 4 and basis_label:
+        st.markdown(f"#### {basis_label} Forward-Forward Basis")
+        st.caption(f"Fwd-fwd {fr_b} → fwd-fwd {fr_a} for same start/tenor")
+        if "hist_fvb_list" not in st.session_state:
+            st.session_state["hist_fvb_list"] = [(2,2)]
+
+        bc1,bc2,bc3,bc4 = st.columns([1,1,0.7,1.5])
+        with bc1: _fvb_st = st.selectbox("Start (years)", _fwd_starts, index=_fwd_starts.index(2), key="hfvb_st")
+        with bc2: _fvb_tn = st.selectbox("Tenor (years)", _fwd_tenors, index=_fwd_tenors.index(2), key="hfvb_tn")
+        with bc3:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("➕ Add", key="hfvb_add", use_container_width=True):
+                if (_fvb_st, _fvb_tn) not in st.session_state["hist_fvb_list"]:
+                    st.session_state["hist_fvb_list"].append((_fvb_st, _fvb_tn))
+        with bc4:
+            rc1, rc2 = st.columns([3,1])
+            with rc1: _fvb_rm = st.selectbox("Remove", ["  —  "]+[f"{s}y{t}y" for s,t in st.session_state["hist_fvb_list"]], key="hfvb_rm")
+            with rc2:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➖", key="hfvb_rm_btn", use_container_width=True) and _fvb_rm != "  —  ":
+                    _rp = _fvb_rm[:-1].split("y")
+                    if len(_rp)==2:
+                        try:
+                            if (int(_rp[0]),int(_rp[1])) in st.session_state["hist_fvb_list"]:
+                                st.session_state["hist_fvb_list"].remove((int(_rp[0]),int(_rp[1])))
+                        except: pass
+
+        c1,c2 = st.columns(2)
+        with c1: _fvb_yr = st.slider("History (years)",1,8,5,key="hfvb_yr")
+        _cut_fvb = pd.Timestamp.now() - pd.DateOffset(years=_fvb_yr)
+        _fig_fvb = go.Figure()
+        _fvb_series = {}
+        for _s,_t in st.session_state["hist_fvb_list"]:
+            _rb = _fwd(_wb,_s,_t) if not _wb.empty else None
+            _ra = _fwd(_wa,_s,_t)
+            if _rb is not None and _ra is not None:
+                _b = (_rb-_ra).dropna()
+                _b = _b[_b.index>=_cut_fvb]*100
+                if not _b.empty:
+                    _fvb_series[f"{_s}y{_t}y {basis_label}"] = _b
+
+        for _i,(_l,_b) in enumerate(_fvb_series.items()):
+            _add_series(_fig_fvb, _l, _b, _sp_colors[_i%len(_sp_colors)])
+        _fig_fvb.add_hline(y=0, line=dict(color="#64748b", width=1))
+        _fig_layout(_fig_fvb, _cut_fvb, f"{basis_label} Fwd-Fwd Basis (bp)")
+        if _fvb_series:
+            st.plotly_chart(_fig_fvb, use_container_width=True)
+            _chart_stats(_fvb_series, "fvb", "bp")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 5: BASIS SPREADS
+    # ════════════════════════════════════════════════════════════
+    if _active == 5 and basis_label:
+        st.markdown(f"#### {basis_label} Basis Spreads")
+        _com_sp = sorted([c for c in _wb.columns if c in _wa.columns and c.endswith("Y")],
+                          key=lambda x: int(x[:-1])) if not _wb.empty else []
+        if len(_com_sp) < 2:
+            st.info("Need at least 2 overlapping tenors.")
+        else:
+            if "hist_bsp_list" not in st.session_state:
+                st.session_state["hist_bsp_list"] = [(_com_sp[0], _com_sp[-1])] if _com_sp else []
+
+            bc1,bc2,bc3,bc4 = st.columns([1.2,1.2,0.7,1.5])
+            with bc1: _bsp_l1 = st.selectbox(f"Leg 1 ({basis_label} tenor)", _com_sp, index=0, key="hbsp_l1")
+            with bc2: _bsp_l2 = st.selectbox(f"Leg 2 ({basis_label} tenor)", _com_sp, index=min(2,len(_com_sp)-1), key="hbsp_l2")
+            with bc3:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➕ Add", key="hbsp_add", use_container_width=True):
+                    if _bsp_l1 != _bsp_l2 and (_bsp_l1, _bsp_l2) not in st.session_state["hist_bsp_list"]:
+                        st.session_state["hist_bsp_list"].append((_bsp_l1, _bsp_l2))
+            with bc4:
+                rc1, rc2 = st.columns([3,1])
+                with rc1: _bsp_rm = st.selectbox("Remove", ["  —  "]+[f"{a} → {b}" for a,b in st.session_state["hist_bsp_list"]], key="hbsp_rm")
+                with rc2:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("➖", key="hbsp_rm_btn", use_container_width=True) and _bsp_rm != "  —  ":
+                        _rp=_bsp_rm.split(" → ")
+                        if len(_rp)==2 and tuple(_rp) in st.session_state["hist_bsp_list"]:
+                            st.session_state["hist_bsp_list"].remove(tuple(_rp))
+
+            c1,c2 = st.columns(2)
+            with c1: _bsp_yr = st.slider("History (years)",1,8,5,key="hbsp_yr")
+            _cut_bsp = pd.Timestamp.now() - pd.DateOffset(years=_bsp_yr)
+            _fig_bsp = go.Figure()
+            _bsp_series = {}
+            for _a,_b in st.session_state["hist_bsp_list"]:
+                if _a not in _wb.columns or _a not in _wa.columns: continue
+                if _b not in _wb.columns or _b not in _wa.columns: continue
+                _ba=(_wb[_a]-_wa[_a]).dropna()*100
+                _bb=(_wb[_b]-_wa[_b]).dropna()*100
+                _bsprd=(_ba-_bb).dropna()
+                _bsprd = _bsprd[_bsprd.index>=_cut_bsp]
+                if not _bsprd.empty:
+                    _bsp_series[f"{_a} → {_b} {basis_label}"] = _bsprd
+
+            for _i,(_lbl,_s) in enumerate(_bsp_series.items()):
+                _add_series(_fig_bsp, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
+            _fig_bsp.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_layout(_fig_bsp, _cut_bsp, f"{basis_label} Spread (bp)")
+            if _bsp_series:
+                st.plotly_chart(_fig_bsp, use_container_width=True)
+                _chart_stats(_bsp_series, "bsp", "bp")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 6: BASIS BUTTERFLIES
+    # ════════════════════════════════════════════════════════════
+    if _active == 6 and basis_label:
+        st.markdown(f"#### {basis_label} Basis Butterflies")
+        st.caption(f"Fly = {basis_label}(body) − 0.5×[{basis_label}(wing1) + {basis_label}(wing2)]")
+        _com_bf = sorted([c for c in _wb.columns if c in _wa.columns and c.endswith("Y")],
+                          key=lambda x: int(x[:-1])) if not _wb.empty else []
+        if len(_com_bf) < 3:
+            st.info("Need at least 3 overlapping tenors.")
+        else:
+            if "hist_bbf_list" not in st.session_state:
+                st.session_state["hist_bbf_list"] = [(_com_bf[0], _com_bf[len(_com_bf)//2], _com_bf[-1])]
+
+            bc1,bc2,bc3,bc4,bc5 = st.columns([1,1,1,0.7,1.5])
+            with bc1: _bf_w1 = st.selectbox("Wing 1", _com_bf, index=0, key="hbbf_w1")
+            with bc2: _bf_bd = st.selectbox("Body", _com_bf, index=min(2,len(_com_bf)-1), key="hbbf_bd")
+            with bc3: _bf_w2 = st.selectbox("Wing 2", _com_bf, index=min(4,len(_com_bf)-1), key="hbbf_w2")
+            with bc4:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("➕ Add", key="hbbf_add", use_container_width=True):
+                    if len({_bf_w1,_bf_bd,_bf_w2})==3 and (_bf_w1,_bf_bd,_bf_w2) not in st.session_state["hist_bbf_list"]:
+                        st.session_state["hist_bbf_list"].append((_bf_w1,_bf_bd,_bf_w2))
+            with bc5:
+                rc1,rc2 = st.columns([3,1])
+                with rc1: _bf_rm = st.selectbox("Remove", ["  —  "]+[f"{w}/{m}/{e}" for w,m,e in st.session_state["hist_bbf_list"]], key="hbbf_rm")
+                with rc2:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("➖", key="hbbf_rm_btn", use_container_width=True) and _bf_rm != "  —  ":
+                        _rp = _bf_rm.split("/")
+                        if len(_rp)==3 and tuple(_rp) in st.session_state["hist_bbf_list"]:
+                            st.session_state["hist_bbf_list"].remove(tuple(_rp))
+
+            c1,c2 = st.columns(2)
+            with c1: _bf_yr = st.slider("History (years)",1,8,5,key="hbbf_yr")
+            _cut_bf = pd.Timestamp.now() - pd.DateOffset(years=_bf_yr)
+            _fig_bf = go.Figure()
+            _bf_series = {}
+            for _w1,_bd,_w2 in st.session_state["hist_bbf_list"]:
+                if any(t not in _wb.columns or t not in _wa.columns for t in [_w1,_bd,_w2]): continue
+                _b_w1 = (_wb[_w1]-_wa[_w1]).dropna()*100
+                _b_bd = (_wb[_bd]-_wa[_bd]).dropna()*100
+                _b_w2 = (_wb[_w2]-_wa[_w2]).dropna()*100
+                _bfly = (_b_bd - 0.5*(_b_w1+_b_w2)).dropna()
+                _bfly = _bfly[_bfly.index>=_cut_bf]
+                if not _bfly.empty:
+                    _bf_series[f"{_w1}/{_bd}/{_w2}"] = _bfly
+
+            for _i,(_lbl,_s) in enumerate(_bf_series.items()):
+                _add_series(_fig_bf, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
+            _fig_bf.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_layout(_fig_bf, _cut_bf, f"{basis_label} Fly (bp)")
+            if _bf_series:
+                st.plotly_chart(_fig_bf, use_container_width=True)
+                _chart_stats(_bf_series, "bbf", "bp")
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
@@ -781,12 +1364,12 @@ def main():
         
         page = st.radio(
             "Navigation",
-            ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts", "ℹ️ About"],
+            ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts", "📐 Historicals", "ℹ️ About"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.6")
+        st.caption("RateEdge Data Portal v1.7")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
@@ -800,6 +1383,8 @@ def main():
         page_basis_swaps()
     elif page == "📉 Charts":
         page_charts()
+    elif page == "📐 Historicals":
+        page_historicals()
     elif page == "ℹ️ About":
         page_about()
 
