@@ -88,8 +88,10 @@ def render_login():
             st.session_state.auth_step = 'email'
         
         if st.session_state.auth_step == 'email':
-            email = st.text_input("Email address", key="login_email", placeholder="your.email@company.com")
-            if st.button("📧 Send Verification Code", key="send_btn", use_container_width=True, type="primary"):
+            with st.form("email_form"):
+                email = st.text_input("Email address", key="login_email", placeholder="your.email@company.com")
+                submitted = st.form_submit_button("📧 Send Verification Code", use_container_width=True, type="primary")
+            if submitted:
                 if email and '@' in email:
                     status, data = request_otp(email)
                     if status == 200:
@@ -107,9 +109,10 @@ def render_login():
         elif st.session_state.auth_step == 'otp':
             email = st.session_state.get('auth_email', '')
             st.info(f"📧 Code sent to: **{email}**")
-            code = st.text_input("Enter 6-digit code", key="otp_code", max_chars=6)
-            
-            if st.button("✅ Verify", key="verify_btn", use_container_width=True, type="primary"):
+            with st.form("otp_form"):
+                code = st.text_input("Enter 6-digit code", key="otp_code", max_chars=6)
+                submitted = st.form_submit_button("✅ Verify", use_container_width=True, type="primary")
+            if submitted:
                 if code and len(code) == 6:
                     status, data = verify_otp(email, code)
                     if status == 200:
@@ -783,7 +786,7 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.5")
+        st.caption("RateEdge Data Portal v1.6")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
