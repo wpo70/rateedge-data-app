@@ -187,11 +187,32 @@ def get_swap_rates(currency: str = None, days: int = 30):
 
 @st.cache_data(ttl=300)
 def get_benchmark_rates(currency: str = None, days: int = 30):
-    """Fetch benchmark rates from Supabase"""
+    """Fetch benchmark rates (excluding basis swaps) from Supabase"""
     query = """
         SELECT date, currency, rate_type, rate
         FROM benchmark_rates
         WHERE date >= CURRENT_DATE - INTERVAL '%s days'
+        AND rate_type NOT LIKE 'BASIS%%'
+        AND rate_type NOT LIKE 'SOFR_FF_BASIS%%'
+    """
+    params = [days]
+    
+    if currency and currency != "All":
+        query += " AND currency = %s"
+        params.append(currency)
+    
+    query += " ORDER BY date DESC, currency, rate_type"
+    
+    return run_query(query, params)
+
+@st.cache_data(ttl=300)
+def get_basis_swaps(currency: str = None, days: int = 30):
+    """Fetch basis swap rates from Supabase"""
+    query = """
+        SELECT date, currency, rate_type, rate
+        FROM benchmark_rates
+        WHERE date >= CURRENT_DATE - INTERVAL '%s days'
+        AND (rate_type LIKE 'BASIS%%' OR rate_type LIKE 'SOFR_FF_BASIS%%')
     """
     params = [days]
     
@@ -419,27 +440,62 @@ def page_swap_rates():
     # Pivot table view
     st.subheader("Latest Rates by Tenor")
     
+    # Tenor ordering
+    tenor_order = ['1W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
+                   '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
+    
+    def sort_and_filter_pivot(df):
+        """Sort pivot table by tenor order and filter out numeric tenors"""
+        # Filter to only valid string tenors
+        valid_tenors = [t for t in df.index if str(t).upper() in [x.upper() for x in tenor_order]]
+        df_filtered = df.loc[valid_tenors].copy()
+        
+        # Sort by tenor order
+        def get_order(t):
+            t_upper = str(t).upper()
+            if t_upper in [x.upper() for x in tenor_order]:
+                return [x.upper() for x in tenor_order].index(t_upper)
+            return 99
+        
+        df_filtered['_order'] = [get_order(t) for t in df_filtered.index]
+        df_filtered = df_filtered.sort_values('_order').drop('_order', axis=1)
+        
+        # Uppercase the index labels
+        df_filtered.index = [str(t).upper() for t in df_filtered.index]
+        
+        return df_filtered
+    
     if currency != "All":
         latest = get_latest_rates(currency)
         if not latest.empty:
+            # Filter to valid tenors only
+            latest = latest[latest['tenor'].str.upper().isin([t.upper() for t in tenor_order])]
+            latest['tenor'] = latest['tenor'].str.upper()
+            
             pivot = latest.pivot_table(
                 index='tenor', 
                 columns='floating_rate', 
                 values='rate',
                 aggfunc='first'
             )
+            pivot = sort_and_filter_pivot(pivot)
             st.dataframe(pivot, use_container_width=True)
     else:
         for ccy in db_currencies:
             with st.expander(f"🔹 {ccy}", expanded=True):
                 latest = get_latest_rates(ccy)
                 if not latest.empty:
+                    # Filter to valid tenors only
+                    latest = latest[latest['tenor'].str.upper().isin([t.upper() for t in tenor_order])]
+                    latest['tenor'] = latest['tenor'].str.upper()
+                    
                     pivot = latest.pivot_table(
                         index='tenor', 
                         columns='floating_rate', 
                         values='rate',
                         aggfunc='first'
                     )
+                    pivot = sort_and_filter_pivot(pivot)
                     st.dataframe(pivot, use_container_width=True)
     
     # Raw data
@@ -456,8 +512,8 @@ def page_swap_rates():
     )
 
 def page_benchmark_rates():
-    """Benchmark rates page"""
-    st.header("📈 Benchmark Rates")
+    """Benchmark rates & central banks page"""
+    st.header("📈 Benchmarks & Central Banks")
     
     # Get currencies from database
     db_currencies = get_available_currencies()
@@ -482,8 +538,14 @@ def page_benchmark_rates():
     # Summary
     st.info(f"Showing {len(df):,} records from last {days} days")
     
-    # Display
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    # Group by currency
+    if currency == "All":
+        for ccy in df['currency'].unique():
+            with st.expander(f"🔹 {ccy}", expanded=True):
+                ccy_df = df[df['currency'] == ccy]
+                st.dataframe(ccy_df, use_container_width=True, hide_index=True)
+    else:
+        st.dataframe(df, use_container_width=True, hide_index=True)
     
     # Download
     csv = df.to_csv(index=False)
@@ -491,6 +553,121 @@ def page_benchmark_rates():
         "📥 Download CSV",
         csv,
         f"benchmark_rates_{currency}_{datetime.now().strftime('%Y%m%d')}.csv",
+        "text/csv"
+    )
+
+def page_basis_swaps():
+    """Basis swaps page"""
+    st.header("🔄 Basis Swaps")
+    
+    st.markdown("""
+    **Available Basis Swaps:**
+    - **AUD**: 3v1 (3M BBSW vs 1M OIS), 6v3 (6M BBSW vs 3M BBSW)
+    - **USD**: SOFR vs Fed Funds
+    """)
+    
+    # Get currencies that have basis data
+    currencies = ["All", "AUD", "USD"]
+    
+    # Filters
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        currency = st.selectbox("Currency", currencies, key="basis_ccy")
+    with col2:
+        days = st.selectbox("Period", [7, 14, 30, 60, 90, 180, 365, 730, 1825], index=4, key="basis_days",
+                           format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
+    
+    # Fetch data
+    df = get_basis_swaps(currency if currency != "All" else None, days)
+    
+    if df.empty:
+        st.warning("No basis swap data found")
+        return
+    
+    # Summary
+    st.info(f"Showing {len(df):,} records from last {days} days")
+    
+    # Tenor order for sorting
+    tenor_order = ['3M', '6M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y']
+    
+    # Parse basis type and tenor from rate_type
+    def parse_basis(rate_type):
+        # e.g., BASIS_3v1_5Y -> (3v1, 5Y), SOFR_FF_BASIS_5Y -> (SOFR-FF, 5Y)
+        if rate_type.startswith('BASIS_'):
+            parts = rate_type.replace('BASIS_', '').split('_')
+            return parts[0], parts[1] if len(parts) > 1 else ''
+        elif rate_type.startswith('SOFR_FF_BASIS_'):
+            tenor = rate_type.replace('SOFR_FF_BASIS_', '')
+            return 'SOFR-FF', tenor
+        return rate_type, ''
+    
+    # Create pivot tables by currency and basis type
+    if currency == "All":
+        for ccy in ['AUD', 'USD']:
+            ccy_df = df[df['currency'] == ccy].copy()
+            if ccy_df.empty:
+                continue
+            
+            with st.expander(f"🔹 {ccy}", expanded=True):
+                # Get latest date
+                latest_date = ccy_df['date'].max()
+                latest = ccy_df[ccy_df['date'] == latest_date].copy()
+                
+                latest[['basis_type', 'tenor']] = latest['rate_type'].apply(lambda x: pd.Series(parse_basis(x)))
+                
+                # Pivot by basis type
+                pivot = latest.pivot_table(
+                    index='tenor',
+                    columns='basis_type',
+                    values='rate',
+                    aggfunc='first'
+                )
+                
+                # Sort by tenor
+                def get_order(t):
+                    if t in tenor_order:
+                        return tenor_order.index(t)
+                    return 99
+                pivot['_order'] = [get_order(t) for t in pivot.index]
+                pivot = pivot.sort_values('_order').drop('_order', axis=1)
+                
+                st.dataframe(pivot, use_container_width=True)
+    else:
+        ccy_df = df.copy()
+        latest_date = ccy_df['date'].max()
+        latest = ccy_df[ccy_df['date'] == latest_date].copy()
+        
+        latest[['basis_type', 'tenor']] = latest['rate_type'].apply(lambda x: pd.Series(parse_basis(x)))
+        
+        # Pivot by basis type
+        pivot = latest.pivot_table(
+            index='tenor',
+            columns='basis_type',
+            values='rate',
+            aggfunc='first'
+        )
+        
+        # Sort by tenor
+        def get_order(t):
+            if t in tenor_order:
+                return tenor_order.index(t)
+            return 99
+        pivot['_order'] = [get_order(t) for t in pivot.index]
+        pivot = pivot.sort_values('_order').drop('_order', axis=1)
+        
+        st.dataframe(pivot, use_container_width=True)
+    
+    # Raw data
+    with st.expander("📋 Raw Data"):
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # Download
+    csv = df.to_csv(index=False)
+    st.download_button(
+        "📥 Download CSV",
+        csv,
+        f"basis_swaps_{currency}_{datetime.now().strftime('%Y%m%d')}.csv",
         "text/csv"
     )
 
@@ -564,12 +741,12 @@ def main():
         
         page = st.radio(
             "Navigation",
-            ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "📉 Charts", "ℹ️ About"],
+            ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts", "ℹ️ About"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.3")
+        st.caption("RateEdge Data Portal v1.4")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
@@ -579,6 +756,8 @@ def main():
         page_swap_rates()
     elif page == "📈 Benchmarks":
         page_benchmark_rates()
+    elif page == "🔄 Basis Swaps":
+        page_basis_swaps()
     elif page == "📉 Charts":
         page_charts()
     elif page == "ℹ️ About":
