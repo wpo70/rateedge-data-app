@@ -535,17 +535,54 @@ def page_benchmark_rates():
         st.warning("No benchmark rate data found")
         return
     
-    # Summary
-    st.info(f"Showing {len(df):,} records from last {days} days")
+    # Column ordering per currency
+    col_order = {
+        'AUD': ['RBA_CASH', 'BBSW_1M', 'BBSW_2M', 'BBSW_3M', 'BBSW_4M', 'BBSW_5M', 'BBSW_6M', 'AONIA'],
+        'NZD': ['RBNZ_OCR', 'OCR_1D', 'BKBM_1M', 'BKBM_2M', 'BKBM_3M'],
+        'USD': ['FED_FUNDS_TARGET', 'FED_FUNDS_EFF', 'SOFR_1D', 'SOFR_COMP_1M', 'SOFR_COMP_3M', 'SOFR_COMP_6M', 'SOFR_COMP_12M', 
+                'TERM_SOFR_1M', 'TERM_SOFR_3M', 'TERM_SOFR_6M', 'TERM_SOFR_12M']
+    }
+    
+    def pivot_benchmarks(ccy_df, ccy):
+        """Pivot benchmark data: dates as rows, rate_types as columns"""
+        if ccy_df.empty:
+            return pd.DataFrame()
+        
+        # Pivot
+        pivot = ccy_df.pivot_table(index='date', columns='rate_type', values='rate', aggfunc='last')
+        pivot = pivot.sort_index(ascending=False)
+        
+        # Reorder columns based on currency
+        if ccy in col_order:
+            ordered_cols = [c for c in col_order[ccy] if c in pivot.columns]
+            other_cols = [c for c in pivot.columns if c not in col_order[ccy]]
+            pivot = pivot[ordered_cols + other_cols]
+        
+        # Format column names (remove underscores for display)
+        pivot.columns = [c.replace('_', ' ') for c in pivot.columns]
+        
+        # Reset index to show date as column
+        pivot = pivot.reset_index()
+        pivot['date'] = pd.to_datetime(pivot['date']).dt.strftime('%Y-%m-%d')
+        
+        return pivot
     
     # Group by currency
     if currency == "All":
-        for ccy in df['currency'].unique():
-            with st.expander(f"🔹 {ccy}", expanded=True):
+        for ccy in sorted(df['currency'].unique()):
+            with st.expander(f"🔹 {ccy} Benchmarks", expanded=True):
                 ccy_df = df[df['currency'] == ccy]
-                st.dataframe(ccy_df, use_container_width=True, hide_index=True)
+                pivot = pivot_benchmarks(ccy_df, ccy)
+                if not pivot.empty:
+                    st.dataframe(pivot, use_container_width=True, hide_index=True)
+                else:
+                    st.info(f"No data for {ccy}")
     else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        pivot = pivot_benchmarks(df, currency)
+        if not pivot.empty:
+            st.dataframe(pivot, use_container_width=True, hide_index=True)
+        else:
+            st.info("No data")
     
     # Download
     csv = df.to_csv(index=False)
