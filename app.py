@@ -301,8 +301,9 @@ def render_curve(currency: str):
     floating_rates = df['floating_rate'].unique()
     
     # Tenor ordering with proper labels
-    tenor_order = ['1W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
-                   '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
+                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+                   '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     # Filter to only include valid tenors (string format like 1M, 5Y etc)
     valid_tenors = [t for t in tenor_order]
@@ -445,8 +446,9 @@ def page_swap_rates():
     st.subheader("Latest Rates by Tenor")
     
     # Tenor ordering
-    tenor_order = ['1W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', 
-                   '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
+                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+                   '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     def sort_and_filter_pivot(df):
         """Sort pivot table by tenor order and filter out numeric tenors"""
@@ -715,29 +717,109 @@ def page_basis_swaps():
 def page_charts():
     """Historical charts page"""
     st.header("📉 Historical Charts")
-    
+
+    # Proper tenor sorting
+    def _sort_tenors(tenor_list):
+        """Sort tenors properly: 1W, 1M, 2M, ..., 1Y, 2Y, ..., 50Y"""
+        ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
+                   '1Y','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
+                   '12Y','15Y','20Y','25Y','30Y','35Y','40Y','50Y','60Y']
+        valid = [t for t in ORDERED if t in tenor_list]
+        return valid
+
     # Get currencies from database
     currencies = get_available_currencies()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        currency = st.selectbox("Currency", currencies, key="chart_ccy")
-    
-    # Get available tenors for this currency
-    df = get_latest_rates(currency)
-    tenors = df['tenor'].unique().tolist() if not df.empty else ['5Y']
-    floating_rates = df['floating_rate'].unique().tolist() if not df.empty else ['3M BBSW']
-    
-    with col2:
-        tenor = st.selectbox("Tenor", tenors, key="chart_tenor")
-    with col3:
-        floating_rate = st.selectbox("Floating Rate", floating_rates, key="chart_float")
-    with col4:
-        days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_days",
-                           format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
-    
-    render_rate_chart(currency, tenor, floating_rate, days)
+
+    chart_mode = st.radio("Mode", ["Single Currency", "Currency A vs B"], horizontal=True, key="chart_mode")
+
+    if chart_mode == "Single Currency":
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            currency = st.selectbox("Currency", currencies, key="chart_ccy")
+
+        df = get_latest_rates(currency)
+        raw_tenors = df['tenor'].unique().tolist() if not df.empty else []
+        tenors = _sort_tenors(raw_tenors) or ['5Y']
+        floating_rates = sorted(df['floating_rate'].unique().tolist()) if not df.empty else ['3M BBSW']
+
+        with col2:
+            tenor = st.selectbox("Tenor", tenors, key="chart_tenor")
+        with col3:
+            floating_rate = st.selectbox("Floating Rate", floating_rates, key="chart_float")
+        with col4:
+            days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_days",
+                               format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
+
+        render_rate_chart(currency, tenor, floating_rate, days)
+
+    else:
+        # Currency A vs B comparison
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            ccy_a = st.selectbox("Currency A", currencies, index=0, key="chart_ccy_a")
+        with col2:
+            ccy_b = st.selectbox("Currency B", currencies, index=min(1, len(currencies)-1), key="chart_ccy_b")
+
+        df_a = get_latest_rates(ccy_a)
+        df_b = get_latest_rates(ccy_b)
+        tenors_a = _sort_tenors(df_a['tenor'].unique().tolist()) if not df_a.empty else []
+        tenors_b = _sort_tenors(df_b['tenor'].unique().tolist()) if not df_b.empty else []
+        common_tenors = [t for t in tenors_a if t in tenors_b] or ['5Y']
+        fr_a = sorted(df_a['floating_rate'].unique().tolist()) if not df_a.empty else ['3M BBSW']
+        fr_b = sorted(df_b['floating_rate'].unique().tolist()) if not df_b.empty else ['SOFR']
+
+        with col3:
+            tenor = st.selectbox("Tenor", common_tenors, key="chart_ab_tenor")
+        with col4:
+            days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_ab_days",
+                               format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
+
+        col_fa, col_fb, col_spread = st.columns(3)
+        with col_fa:
+            float_a = st.selectbox(f"{ccy_a} Float", fr_a, key="chart_ab_fra")
+        with col_fb:
+            float_b = st.selectbox(f"{ccy_b} Float", fr_b, key="chart_ab_frb")
+        with col_spread:
+            show_spread = st.checkbox("Show spread (A − B)", False, key="chart_ab_spread")
+
+        hist_a = get_rate_history(ccy_a, tenor, float_a, days)
+        hist_b = get_rate_history(ccy_b, tenor, float_b, days)
+
+        if hist_a.empty and hist_b.empty:
+            st.info("No data for either currency.")
+        else:
+            fig = go.Figure()
+            if not show_spread:
+                if not hist_a.empty:
+                    fig.add_trace(go.Scatter(x=hist_a['date'], y=hist_a['rate'], mode='lines',
+                        name=f"{ccy_a} {tenor} {float_a}", line=dict(color='#3b82f6', width=1.8)))
+                if not hist_b.empty:
+                    fig.add_trace(go.Scatter(x=hist_b['date'], y=hist_b['rate'], mode='lines',
+                        name=f"{ccy_b} {tenor} {float_b}", line=dict(color='#ef4444', width=1.8)))
+                fig.update_layout(yaxis_title="Rate (%)",
+                    title=f"{ccy_a} vs {ccy_b} — {tenor}")
+            else:
+                if not hist_a.empty and not hist_b.empty:
+                    merged = pd.merge(hist_a, hist_b, on='date', suffixes=('_a','_b'))
+                    merged['spread'] = (merged['rate_a'] - merged['rate_b']) * 100
+                    fig.add_trace(go.Scatter(x=merged['date'], y=merged['spread'], mode='lines',
+                        name=f"{ccy_a} − {ccy_b}", line=dict(color='#22c55e', width=1.8)))
+                    fig.add_hline(y=merged['spread'].mean(), line=dict(color='#94a3b8', dash='dash', width=1))
+                    fig.update_layout(yaxis_title="Spread (bp)",
+                        title=f"{ccy_a} − {ccy_b} {tenor} Spread")
+                else:
+                    st.warning("Need data for both currencies to show spread.")
+
+            fig.update_layout(
+                hovermode='x unified', xaxis_title="", height=460,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.8)",
+                legend=dict(orientation="h", y=1.06, font=dict(color="#e2e8f0")),
+                xaxis=dict(gridcolor="#334155", color="#94a3b8"),
+                yaxis=dict(gridcolor="#334155", color="#94a3b8"),
+                font=dict(color="#94a3b8"),
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 def page_about():
     """About page"""
@@ -1597,7 +1679,7 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.8")
+        st.caption("RateEdge Data Portal v1.9")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
