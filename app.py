@@ -783,7 +783,7 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.4")
+        st.caption("RateEdge Data Portal v1.5")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
