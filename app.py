@@ -250,8 +250,6 @@ def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int =
     
     # Display name for floating rate
     display_name = floating_rate
-    if currency == "AUD" and floating_rate == "AONIA":
-        display_name = "OIS"
     
     fig = px.line(
         df, x='date', y='rate',
@@ -303,10 +301,8 @@ def render_curve(currency: str):
         if subset.empty:
             continue
         
-        # Rename AONIA to OIS for AUD
+        # Use original floating rate name
         display_name = fr
-        if currency == "AUD" and fr == "AONIA":
-            display_name = "OIS"
         
         # Sort by tenor order
         def get_tenor_order(t):
@@ -425,9 +421,6 @@ def page_swap_rates():
     if currency != "All":
         latest = get_latest_rates(currency)
         if not latest.empty:
-            # Rename AONIA to OIS for AUD
-            if currency == "AUD":
-                latest['floating_rate'] = latest['floating_rate'].replace('AONIA', 'OIS')
             pivot = latest.pivot_table(
                 index='tenor', 
                 columns='floating_rate', 
@@ -440,9 +433,6 @@ def page_swap_rates():
             with st.expander(f"🔹 {ccy}", expanded=True):
                 latest = get_latest_rates(ccy)
                 if not latest.empty:
-                    # Rename AONIA to OIS for AUD
-                    if ccy == "AUD":
-                        latest['floating_rate'] = latest['floating_rate'].replace('AONIA', 'OIS')
                     pivot = latest.pivot_table(
                         index='tenor', 
                         columns='floating_rate', 
@@ -520,20 +510,10 @@ def page_charts():
     tenors = df['tenor'].unique().tolist() if not df.empty else ['5Y']
     floating_rates = df['floating_rate'].unique().tolist() if not df.empty else ['3M BBSW']
     
-    # Rename AONIA to OIS for display
-    display_floating_rates = []
-    for fr in floating_rates:
-        if currency == "AUD" and fr == "AONIA":
-            display_floating_rates.append("OIS")
-        else:
-            display_floating_rates.append(fr)
-    
     with col2:
         tenor = st.selectbox("Tenor", tenors, key="chart_tenor")
     with col3:
-        fr_display = st.selectbox("Floating Rate", display_floating_rates, key="chart_float")
-        # Map back to actual value
-        floating_rate = floating_rates[display_floating_rates.index(fr_display)]
+        floating_rate = st.selectbox("Floating Rate", floating_rates, key="chart_float")
     with col4:
         days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_days",
                            format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
