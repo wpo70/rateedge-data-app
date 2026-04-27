@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import psycopg2
 import requests
+import numpy as np
 
 # Page config - MUST BE FIRST
 st.set_page_config(
@@ -758,6 +759,232 @@ def page_about():
     """)
 
 # ============================================================================
+# FORWARD MATRICES
+# ============================================================================
+
+def _tenor_to_years(t: str) -> float:
+    """Convert tenor string to years: 1W→0.019, 3M→0.25, 1Y→1.0, etc."""
+    t = t.strip().upper()
+    if t.endswith("W"): return float(t[:-1]) / 52.0
+    if t.endswith("M"): return float(t[:-1]) / 12.0
+    if t.endswith("Y"): return float(t[:-1])
+    return float(t)
+
+@st.cache_data(ttl=300, show_spinner="Loading latest curve…")
+def _get_par_curve(currency: str, floating_rate: str):
+    """Get latest par rates as sorted (years, rates) arrays."""
+    query = """
+        SELECT DISTINCT ON (tenor) tenor, rate
+        FROM swap_rates
+        WHERE currency = %s AND floating_rate = %s
+        ORDER BY tenor, date DESC
+    """
+    df = run_query(query, [currency, floating_rate])
+    if df.empty:
+        return None, None, None
+    pairs = []
+    for _, row in df.iterrows():
+        try:
+            y = _tenor_to_years(row["tenor"])
+            pairs.append((y, float(row["rate"])))
+        except:
+            pass
+    if not pairs:
+        return None, None, None
+    pairs.sort()
+    xs = np.array([p[0] for p in pairs])
+    ys = np.array([p[1] for p in pairs])
+    # latest date
+    dq = run_query("SELECT MAX(date) as d FROM swap_rates WHERE currency = %s AND floating_rate = %s", [currency, floating_rate])
+    dt = str(dq.iloc[0]["d"]) if not dq.empty else "?"
+    return xs, ys, dt
+
+def _compute_fwd_matrix(par_x, par_y, expiries_y, tenors_y):
+    """Compute forward matrix from par curve using fwd = (par(t2)*t2 - par(t1)*t1) / tenor.
+    par_x/par_y: sorted arrays of maturities(years) and par rates(%)."""
+    matrix = []
+    for exp in expiries_y:
+        row = []
+        for tenor in tenors_y:
+            t1 = exp
+            t2 = exp + tenor
+            r1 = float(np.interp(t1, par_x, par_y))
+            r2 = float(np.interp(t2, par_x, par_y))
+            fwd = (r2 * t2 - r1 * t1) / tenor
+            row.append(round(fwd, 4))
+        matrix.append(row)
+    return matrix
+
+def page_fwd_matrices():
+    """Forward swap rate matrices with heatmaps."""
+    st.header("📐 Forward Matrices")
+
+    EXPIRY_LABELS = ["1W","1M","2M","3M","6M","9M","1Y","18M","2Y","3Y","4Y","5Y","6Y","7Y","8Y","9Y","10Y","12Y","15Y","20Y","25Y","30Y"]
+    EXPIRY_YEARS  = [_tenor_to_years(e) for e in EXPIRY_LABELS]
+    TENOR_LABELS  = ["1Y","2Y","3Y","4Y","5Y","7Y","10Y","12Y","15Y","20Y","25Y","30Y"]
+    TENOR_YEARS   = [_tenor_to_years(t) for t in TENOR_LABELS]
+
+    ccy = st.selectbox("Currency", ["AUD", "USD", "NZD"], key="fm_ccy")
+
+    def _render_heatmap(matrix, title, exp_labels, tenor_labels, fmt=".2f", unit="%", colorscale="RdYlGn_r"):
+        """Render a forward matrix as a heatmap + data table."""
+
+        z = [[round(v, 4) if v is not None else 0 for v in row] for row in matrix]
+        text = [[f"{v:{fmt}}" if v is not None else "" for v in row] for row in matrix]
+
+        fig = go.Figure(data=go.Heatmap(
+            z=z, x=tenor_labels, y=exp_labels,
+            text=text, texttemplate="%{text}", textfont=dict(size=10),
+            colorscale=colorscale, showscale=True,
+            colorbar=dict(title=unit, titlefont=dict(color="#94a3b8"), tickfont=dict(color="#94a3b8")),
+        ))
+        fig.update_layout(
+            title=title, height=max(500, len(exp_labels) * 26),
+            margin=dict(l=60, r=20, t=50, b=40),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.8)",
+            xaxis=dict(title="Tenor", color="#94a3b8", side="top"),
+            yaxis=dict(title="Expiry", color="#94a3b8", autorange="reversed"),
+            font=dict(color="#94a3b8", size=11),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Also show as dataframe
+        with st.expander("📋 Data Table"):
+            df = pd.DataFrame(matrix, index=exp_labels, columns=tenor_labels)
+            st.dataframe(df.style.format(fmt), use_container_width=True)
+
+    if ccy == "AUD":
+        st.markdown("---")
+        # Load all three AUD curves
+        qq_x, qq_y, qq_dt = _get_par_curve("AUD", "3M BBSW")
+        ss_x, ss_y, ss_dt = _get_par_curve("AUD", "6M BBSW")
+        ois_x, ois_y, ois_dt = _get_par_curve("AUD", "AONIA")
+
+        if ss_x is None:
+            st.error("No 6M BBSW data found.")
+            return
+
+        st.caption(f"Curve date: {ss_dt}")
+
+        _fm_tab = st.radio("Matrix", ["Market (Dual)", "Q/Q (3M BBSW)", "S/S (6M BBSW)",
+                                       "6v3 Basis", "3v1 Basis"], horizontal=True, key="fm_aud_tab")
+
+        if _fm_tab == "Market (Dual)":
+            # ≤3Y tenor → QQ, ≥4Y → SS
+            matrix = []
+            for exp in EXPIRY_YEARS:
+                row = []
+                for i, tenor in enumerate(TENOR_YEARS):
+                    if tenor <= 3.0 and qq_x is not None:
+                        px, py = qq_x, qq_y
+                    else:
+                        px, py = ss_x, ss_y
+                    t1 = exp; t2 = exp + tenor
+                    r1 = float(np.interp(t1, px, py))
+                    r2 = float(np.interp(t2, px, py))
+                    row.append(round((r2*t2 - r1*t1) / tenor, 4))
+                matrix.append(row)
+            _render_heatmap(matrix, "AUD Forward Matrix — Market Convention (QQ ≤3Y, SS ≥4Y)",
+                           EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "Q/Q (3M BBSW)":
+            if qq_x is None:
+                st.error("No 3M BBSW data found.")
+            else:
+                matrix = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
+                _render_heatmap(matrix, "AUD Forward Matrix — Q/Q (3M BBSW)", EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "S/S (6M BBSW)":
+            matrix = _compute_fwd_matrix(ss_x, ss_y, EXPIRY_YEARS, TENOR_YEARS)
+            _render_heatmap(matrix, "AUD Forward Matrix — S/S (6M BBSW)", EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "6v3 Basis":
+            if qq_x is None:
+                st.error("No 3M BBSW data found.")
+            else:
+                m_ss = _compute_fwd_matrix(ss_x, ss_y, EXPIRY_YEARS, TENOR_YEARS)
+                m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
+                basis = [[(s - q) * 100 for s, q in zip(sr, qr)] for sr, qr in zip(m_ss, m_qq)]
+                _render_heatmap(basis, "AUD 6v3 Forward Basis (bp) — SS fwd − QQ fwd",
+                               EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
+
+        elif _fm_tab == "3v1 Basis":
+            if qq_x is None or ois_x is None:
+                st.error("Need both 3M BBSW and AONIA data.")
+            else:
+                m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
+                m_ois = _compute_fwd_matrix(ois_x, ois_y, EXPIRY_YEARS, TENOR_YEARS)
+                basis = [[(q - o) * 100 for q, o in zip(qr, orow)] for qr, orow in zip(m_qq, m_ois)]
+                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp) — QQ fwd − AONIA fwd",
+                               EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
+
+    elif ccy == "USD":
+        st.markdown("---")
+        sofr_x, sofr_y, sofr_dt = _get_par_curve("USD", "SOFR")
+        ff_x, ff_y, ff_dt = _get_par_curve("USD", "FEDFUNDS")
+
+        if sofr_x is None:
+            st.error("No USD SOFR data found.")
+            return
+
+        st.caption(f"Curve date: {sofr_dt}")
+
+        _fm_tab = st.radio("Matrix", ["SOFR", "Fed Funds", "SOFR-FF Basis"], horizontal=True, key="fm_usd_tab")
+
+        if _fm_tab == "SOFR":
+            matrix = _compute_fwd_matrix(sofr_x, sofr_y, EXPIRY_YEARS, TENOR_YEARS)
+            _render_heatmap(matrix, "USD Forward Matrix — SOFR", EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "Fed Funds":
+            if ff_x is None:
+                st.error("No FEDFUNDS data found.")
+            else:
+                matrix = _compute_fwd_matrix(ff_x, ff_y, EXPIRY_YEARS, TENOR_YEARS)
+                _render_heatmap(matrix, "USD Forward Matrix — Fed Funds", EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "SOFR-FF Basis":
+            if ff_x is None:
+                st.error("No FEDFUNDS data found.")
+            else:
+                m_sofr = _compute_fwd_matrix(sofr_x, sofr_y, EXPIRY_YEARS, TENOR_YEARS)
+                m_ff = _compute_fwd_matrix(ff_x, ff_y, EXPIRY_YEARS, TENOR_YEARS)
+                basis = [[(s - f) * 100 for s, f in zip(sr, fr)] for sr, fr in zip(m_sofr, m_ff)]
+                _render_heatmap(basis, "USD SOFR-FF Forward Basis (bp)",
+                               EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
+
+    elif ccy == "NZD":
+        st.markdown("---")
+        nzd_x, nzd_y, nzd_dt = _get_par_curve("NZD", "BKBM 3M")
+        nzd_ois_x, nzd_ois_y, nzd_ois_dt = _get_par_curve("NZD", "NZONIA")
+
+        if nzd_x is None:
+            st.error("No NZD BKBM 3M data found.")
+            return
+
+        st.caption(f"Curve date: {nzd_dt}")
+
+        if nzd_ois_x is not None:
+            _fm_tab = st.radio("Matrix", ["BKBM 3M", "NZONIA", "BKBM-OIS Basis"], horizontal=True, key="fm_nzd_tab")
+        else:
+            _fm_tab = "BKBM 3M"
+
+        if _fm_tab == "BKBM 3M":
+            matrix = _compute_fwd_matrix(nzd_x, nzd_y, EXPIRY_YEARS, TENOR_YEARS)
+            _render_heatmap(matrix, "NZD Forward Matrix — BKBM 3M", EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "NZONIA":
+            matrix = _compute_fwd_matrix(nzd_ois_x, nzd_ois_y, EXPIRY_YEARS, TENOR_YEARS)
+            _render_heatmap(matrix, "NZD Forward Matrix — NZONIA", EXPIRY_LABELS, TENOR_LABELS)
+
+        elif _fm_tab == "BKBM-OIS Basis":
+            m_bk = _compute_fwd_matrix(nzd_x, nzd_y, EXPIRY_YEARS, TENOR_YEARS)
+            m_ois = _compute_fwd_matrix(nzd_ois_x, nzd_ois_y, EXPIRY_YEARS, TENOR_YEARS)
+            basis = [[(b - o) * 100 for b, o in zip(br, orow)] for br, orow in zip(m_bk, m_ois)]
+            _render_heatmap(basis, "NZD BKBM-OIS Forward Basis (bp)",
+                           EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
+
+
+# ============================================================================
 # HISTORICALS — FWD IRS ANALYSIS
 # ============================================================================
 
@@ -1364,12 +1591,13 @@ def main():
         
         page = st.radio(
             "Navigation",
-            ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts", "📐 Historicals", "ℹ️ About"],
+            ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts",
+             "🔥 Forward Matrices", "📐 Historicals", "ℹ️ About"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.7")
+        st.caption("RateEdge Data Portal v1.8")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
@@ -1383,6 +1611,8 @@ def main():
         page_basis_swaps()
     elif page == "📉 Charts":
         page_charts()
+    elif page == "🔥 Forward Matrices":
+        page_fwd_matrices()
     elif page == "📐 Historicals":
         page_historicals()
     elif page == "ℹ️ About":
