@@ -180,6 +180,20 @@ st.markdown("""
     /* ── Main content text ── */
     p, span, label, .stMarkdown { color: #374151; }
     .stCaption, small { color: #8c95a4 !important; }
+    
+    /* ── Multiselect pills — white text on navy ── */
+    [data-baseweb="tag"] {
+        background-color: #1a3f7a !important;
+        color: white !important;
+    }
+    [data-baseweb="tag"] span { color: white !important; }
+    [data-baseweb="tag"] svg { fill: white !important; }
+    
+    /* ── Hide toolbar, deploy button, Fork, GitHub ── */
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stDecoration"] { display: none !important; }
+    #MainMenu { display: none !important; }
+    header [data-testid="stActionButton"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
