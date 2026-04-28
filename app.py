@@ -118,6 +118,14 @@ st.markdown("""
         background: #234d94 !important;
         box-shadow: 0 2px 8px rgba(26, 63, 122, 0.3);
     }
+    /* Form submit buttons */
+    .stForm button[kind="primaryFormSubmit"],
+    .stForm [data-testid="stFormSubmitButton"] button,
+    button[kind="primaryFormSubmit"] {
+        background: #1a3f7a !important;
+        color: white !important;
+        font-weight: 600;
+    }
     .stButton > button[kind="secondary"] {
         background: #ffffff !important;
         border: 1px solid #d1d5db !important;
@@ -1318,6 +1326,10 @@ def _tenor_to_years(t: str) -> float:
     if t.endswith("Y"): return float(t[:-1])
     return float(t)
 
+_VALID_DB_TENORS = ('1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
+    '1Y','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
+    '12Y','15Y','20Y','25Y','30Y','35Y','40Y','45Y','50Y','60Y')
+
 @st.cache_data(ttl=300, show_spinner="Loading curve…")
 def _get_par_curve(currency: str, floating_rate: str, as_of_date: str = None):
     """Get par rates as sorted (years, rates) arrays. If as_of_date given, use that date's curve."""
@@ -1325,28 +1337,28 @@ def _get_par_curve(currency: str, floating_rate: str, as_of_date: str = None):
         query = """
             SELECT tenor, rate
             FROM swap_rates
-            WHERE currency = %s AND floating_rate = %s AND date = %s
+            WHERE currency = %s AND floating_rate = %s AND date = %s AND tenor IN %s
             ORDER BY tenor
         """
-        df = run_query(query, [currency, floating_rate, as_of_date])
+        df = run_query(query, [currency, floating_rate, as_of_date, _VALID_DB_TENORS])
         # If no data on exact date, try previous business day
         if df.empty:
             query2 = """
                 SELECT DISTINCT ON (tenor) tenor, rate
                 FROM swap_rates
-                WHERE currency = %s AND floating_rate = %s AND date <= %s
+                WHERE currency = %s AND floating_rate = %s AND date <= %s AND tenor IN %s
                 ORDER BY tenor, date DESC
             """
-            df = run_query(query2, [currency, floating_rate, as_of_date])
+            df = run_query(query2, [currency, floating_rate, as_of_date, _VALID_DB_TENORS])
         dt = as_of_date
     else:
         query = """
             SELECT DISTINCT ON (tenor) tenor, rate
             FROM swap_rates
-            WHERE currency = %s AND floating_rate = %s
+            WHERE currency = %s AND floating_rate = %s AND tenor IN %s
             ORDER BY tenor, date DESC
         """
-        df = run_query(query, [currency, floating_rate])
+        df = run_query(query, [currency, floating_rate, _VALID_DB_TENORS])
         dq = run_query("SELECT MAX(date) as d FROM swap_rates WHERE currency = %s AND floating_rate = %s", [currency, floating_rate])
         dt = str(dq.iloc[0]["d"]) if not dq.empty else "?"
     
@@ -1384,7 +1396,7 @@ def _compute_fwd_matrix(par_x, par_y, expiries_y, tenors_y):
 
 def page_fwd_matrices():
     """Forward swap rate matrices with heatmaps and surface plots."""
-    st.header("🔥 Forward Curves")
+    st.header("🔥 Forward Matrix's")
 
     EXPIRY_LABELS = ["1W","1M","2M","3M","6M","9M","1Y","18M","2Y","3Y","4Y","5Y","6Y","7Y","8Y","9Y","10Y","12Y","15Y","20Y","25Y","30Y"]
     EXPIRY_YEARS  = [_tenor_to_years(e) for e in EXPIRY_LABELS]
@@ -1474,7 +1486,7 @@ def page_fwd_matrices():
 
         st.caption(f"Curve date: {ss_dt}")
 
-        _fm_tab = st.radio("Matrix", ["Market (Dual)", "Q/Q (3M BBSW)", "S/S (6M BBSW)",
+        _fm_tab = st.radio("Matrix", ["Market (Dual)", "Q/Q (3M BBSW)", "S/S (6M BBSW)", "OIS (AONIA)",
                                        "6v3 Basis", "3v1 Basis"], horizontal=True, key="fm_aud_tab")
 
         if _fm_tab == "Market (Dual)":
@@ -1506,6 +1518,13 @@ def page_fwd_matrices():
             matrix = _compute_fwd_matrix(ss_x, ss_y, EXPIRY_YEARS, TENOR_YEARS)
             _render_heatmap(matrix, "AUD Forward Matrix — S/S (6M BBSW)", EXPIRY_LABELS, TENOR_LABELS)
 
+        elif _fm_tab == "OIS (AONIA)":
+            if ois_x is None:
+                st.error("No AONIA data found.")
+            else:
+                matrix = _compute_fwd_matrix(ois_x, ois_y, EXPIRY_YEARS, TENOR_YEARS)
+                _render_heatmap(matrix, "AUD Forward Matrix — OIS (AONIA)", EXPIRY_LABELS, TENOR_LABELS)
+
         elif _fm_tab == "6v3 Basis":
             if qq_x is None:
                 st.error("No 3M BBSW data found.")
@@ -1513,7 +1532,7 @@ def page_fwd_matrices():
                 m_ss = _compute_fwd_matrix(ss_x, ss_y, EXPIRY_YEARS, TENOR_YEARS)
                 m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
                 basis = [[(s - q) * 100 for s, q in zip(sr, qr)] for sr, qr in zip(m_ss, m_qq)]
-                _render_heatmap(basis, "AUD 6v3 Forward Basis (bp) — SS fwd − QQ fwd",
+                _render_heatmap(basis, "AUD 6v3 Forward Basis (bp) — Semi (6M) fwd − Quarterly (3M) fwd",
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
 
         elif _fm_tab == "3v1 Basis":
@@ -1523,7 +1542,7 @@ def page_fwd_matrices():
                 m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
                 m_ois = _compute_fwd_matrix(ois_x, ois_y, EXPIRY_YEARS, TENOR_YEARS)
                 basis = [[(q - o) * 100 for q, o in zip(qr, orow)] for qr, orow in zip(m_qq, m_ois)]
-                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp) — QQ fwd − AONIA fwd",
+                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp) — Quarterly (3M) fwd − OIS (AONIA) fwd",
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
 
     elif ccy == "USD":
@@ -2206,13 +2225,13 @@ def main():
         page = st.radio(
             "Navigation",
             ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts",
-             "🔥 Forward Curves", "📐 Historical Rate Analysis", "⬇️ Download", "ℹ️ About"],
+             "🔥 Forward Matrix's", "📐 Historical Rate Analysis", "⬇️ Download", "ℹ️ About"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.4</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.6</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
@@ -2227,7 +2246,7 @@ def main():
         page_basis_swaps()
     elif page == "📉 Charts":
         page_charts()
-    elif page == "🔥 Forward Curves":
+    elif page == "🔥 Forward Matrix's":
         page_fwd_matrices()
     elif page == "📐 Historical Rate Analysis":
         page_historicals()
