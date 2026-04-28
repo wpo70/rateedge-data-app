@@ -987,7 +987,7 @@ VALID_TENORS_ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
 def page_download():
     """Data explorer page with filters — preview only, no download."""
     st.header("⬇️ Data Explorer")
-    st.info("📋 Data is available for preview only. For bulk data access, please contact **will@rateedge.au** to request an API key.")
+    st.info("📋 Data is available for preview only. For bulk data access, please contact **wpo@rateedge.au** to request an API key.")
 
     # Dataset selector
     dataset = st.radio("Dataset", ["Swap Rates", "Benchmarks", "Basis Swaps"], horizontal=True, key="dl_dataset")
