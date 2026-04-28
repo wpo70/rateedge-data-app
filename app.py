@@ -1014,6 +1014,22 @@ VALID_TENORS_ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
 def page_download():
     """Data download page with filters."""
     st.header("⬇️ Data Download")
+    
+    # Admin password gate
+    if "dl_unlocked" not in st.session_state:
+        st.session_state.dl_unlocked = False
+    
+    if not st.session_state.dl_unlocked:
+        st.info("Data downloads require admin access.")
+        with st.form("dl_auth"):
+            pwd = st.text_input("Admin Password", type="password")
+            if st.form_submit_button("Unlock"):
+                if pwd == "RateEdge2026DL":
+                    st.session_state.dl_unlocked = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+        return
 
     # Dataset selector
     dataset = st.radio("Dataset", ["Swap Rates", "Benchmarks", "Basis Swaps"], horizontal=True, key="dl_dataset")
