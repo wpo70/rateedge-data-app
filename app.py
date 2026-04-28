@@ -1868,9 +1868,10 @@ def page_historicals():
                     if len(_rp)==3 and tuple(_rp) in st.session_state["hist_fl_list"]:
                         st.session_state["hist_fl_list"].remove(tuple(_rp))
 
-        c1,c2 = st.columns(2)
+        c1,c2,c3 = st.columns(3)
         with c1: _fl_yr = st.slider("History (years)",1,8,5,key="hfl_yr")
         with c2: _fl_bands = st.checkbox("Mean ± 1σ bands", True, key="hfl_bands")
+        with c3: _fl_as_spread = st.checkbox("Show as spread", False, key="hfl_as_spread")
 
         _cut_fl = pd.Timestamp.now() - pd.DateOffset(years=_fl_yr)
         _fig_fl = go.Figure()
@@ -1886,13 +1887,28 @@ def page_historicals():
             if not _fly.empty:
                 _fl_series[f"{_fw}/{_fm}/{_fe}"] = _fly
 
-        for _i,(_l,_s) in enumerate(_fl_series.items()):
-            _add_series(_fig_fl, _l, _s, _sp_colors[_i%len(_sp_colors)], _fl_bands)
+        if _fl_as_spread and len(_fl_series) >= 2:
+            _fk = list(_fl_series.keys())
+            _fc1, _fc2 = st.columns(2)
+            with _fc1: _fl_s1 = st.selectbox("Series A", _fk, index=0, key="hfl_s1")
+            with _fc2: _fl_s2 = st.selectbox("Series B (subtract)", [k for k in _fk if k != _fl_s1], index=0, key="hfl_s2")
+            if _fl_s1 in _fl_series and _fl_s2 in _fl_series:
+                _cmb = (_fl_series[_fl_s1] - _fl_series[_fl_s2]).dropna()
+                _fig_fl.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
+                    name=f"{_fl_s1}  v  {_fl_s2}", line=dict(color=_sp_colors[0], width=1.8)))
+                _fig_fl.add_hline(y=_cmb.mean(), line=dict(color="#5a6577", dash="dash", width=1))
+                _fl_active = {f"{_fl_s1}  v  {_fl_s2}": _cmb}
+            else:
+                _fl_active = _fl_series
+        else:
+            _fl_active = _fl_series
+            for _i,(_l,_s) in enumerate(_fl_series.items()):
+                _add_series(_fig_fl, _l, _s, _sp_colors[_i%len(_sp_colors)], _fl_bands)
         if _fl_series:
             _fig_fl.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_fl, _cut_fl, "Butterfly (bp)")
             st.plotly_chart(_fig_fl, use_container_width=True)
-            _chart_stats(_fl_series, "fl", "bp")
+            _chart_stats(_fl_active, "fl", "bp")
 
     # ════════════════════════════════════════════════════════════
     # TAB 2: FWD-FWD RATES
@@ -1990,8 +2006,10 @@ def page_historicals():
                     if st.button("➖", key="hb_rm_btn", use_container_width=True) and _b_rm != "  —  " and _b_rm in st.session_state["hist_b_list"]:
                         st.session_state["hist_b_list"].remove(_b_rm)
 
-            c1,c2 = st.columns(2)
+            c1,c2,c3 = st.columns(3)
             with c1: _b_yr = st.slider("History (years)",1,8,5,key="hb_yr")
+            with c2: _b_bands = st.checkbox("Mean ± 1σ bands", False, key="hb_bands")
+            with c3: _b_as_spread = st.checkbox("Show as spread", False, key="hb_as_spread")
             _cut_b = pd.Timestamp.now() - pd.DateOffset(years=_b_yr)
             _fig_b = go.Figure()
             _b_series = {}
@@ -2001,12 +2019,29 @@ def page_historicals():
                 _bs = _bs[_bs.index>=_cut_b]*100
                 if not _bs.empty:
                     _b_series[f"{_tn} {basis_label}"] = _bs
-                    _add_series(_fig_b, f"{_tn} {basis_label}", _bs, _sp_colors[_i%len(_sp_colors)])
+
+            if _b_as_spread and len(_b_series) >= 2:
+                _bk = list(_b_series.keys())
+                _bc1, _bc2 = st.columns(2)
+                with _bc1: _b_s1 = st.selectbox("Series A", _bk, index=0, key="hb_s1")
+                with _bc2: _b_s2 = st.selectbox("Series B (subtract)", [k for k in _bk if k != _b_s1], index=0, key="hb_s2")
+                if _b_s1 in _b_series and _b_s2 in _b_series:
+                    _cmb = (_b_series[_b_s1] - _b_series[_b_s2]).dropna()
+                    _fig_b.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
+                        name=f"{_b_s1}  v  {_b_s2}", line=dict(color=_sp_colors[0], width=1.8)))
+                    _fig_b.add_hline(y=_cmb.mean(), line=dict(color="#5a6577", dash="dash", width=1))
+                    _b_active = {f"{_b_s1}  v  {_b_s2}": _cmb}
+                else:
+                    _b_active = _b_series
+            else:
+                _b_active = _b_series
+                for _i,(_lbl,_bs) in enumerate(_b_series.items()):
+                    _add_series(_fig_b, _lbl, _bs, _sp_colors[_i%len(_sp_colors)], _b_bands)
             _fig_b.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_b, _cut_b, f"{basis_label} Basis (bp)")
             if _b_series:
                 st.plotly_chart(_fig_b, use_container_width=True)
-                _chart_stats(_b_series, "b", "bp")
+                _chart_stats(_b_active, "b", "bp")
 
     # ════════════════════════════════════════════════════════════
     # TAB 4: BASIS FWD-FWD
@@ -2038,8 +2073,9 @@ def page_historicals():
                                 st.session_state["hist_fvb_list"].remove((int(_rp[0]),int(_rp[1])))
                         except: pass
 
-        c1,c2 = st.columns(2)
+        c1,c2,c3 = st.columns(3)
         with c1: _fvb_yr = st.slider("History (years)",1,8,5,key="hfvb_yr")
+        with c2: _fvb_as_spread = st.checkbox("Show as spread", False, key="hfvb_as_spread")
         _cut_fvb = pd.Timestamp.now() - pd.DateOffset(years=_fvb_yr)
         _fig_fvb = go.Figure()
         _fvb_series = {}
@@ -2052,13 +2088,28 @@ def page_historicals():
                 if not _b.empty:
                     _fvb_series[f"{_s}y{_t}y {basis_label}"] = _b
 
-        for _i,(_l,_b) in enumerate(_fvb_series.items()):
-            _add_series(_fig_fvb, _l, _b, _sp_colors[_i%len(_sp_colors)])
+        if _fvb_as_spread and len(_fvb_series) >= 2:
+            _fvk = list(_fvb_series.keys())
+            _fvc1, _fvc2 = st.columns(2)
+            with _fvc1: _fvb_s1 = st.selectbox("Series A", _fvk, index=0, key="hfvb_s1")
+            with _fvc2: _fvb_s2 = st.selectbox("Series B (subtract)", [k for k in _fvk if k != _fvb_s1], index=0, key="hfvb_s2")
+            if _fvb_s1 in _fvb_series and _fvb_s2 in _fvb_series:
+                _cmb = (_fvb_series[_fvb_s1] - _fvb_series[_fvb_s2]).dropna()
+                _fig_fvb.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
+                    name=f"{_fvb_s1}  v  {_fvb_s2}", line=dict(color=_sp_colors[0], width=1.8)))
+                _fig_fvb.add_hline(y=_cmb.mean(), line=dict(color="#5a6577", dash="dash", width=1))
+                _fvb_active = {f"{_fvb_s1}  v  {_fvb_s2}": _cmb}
+            else:
+                _fvb_active = _fvb_series
+        else:
+            _fvb_active = _fvb_series
+            for _i,(_l,_b) in enumerate(_fvb_series.items()):
+                _add_series(_fig_fvb, _l, _b, _sp_colors[_i%len(_sp_colors)])
         _fig_fvb.add_hline(y=0, line=dict(color="#d1d5db", width=1))
         _fig_layout(_fig_fvb, _cut_fvb, f"{basis_label} Fwd-Fwd Basis (bp)")
         if _fvb_series:
             st.plotly_chart(_fig_fvb, use_container_width=True)
-            _chart_stats(_fvb_series, "fvb", "bp")
+            _chart_stats(_fvb_active, "fvb", "bp")
 
     # ════════════════════════════════════════════════════════════
     # TAB 5: BASIS SPREADS
@@ -2091,8 +2142,9 @@ def page_historicals():
                         if len(_rp)==2 and tuple(_rp) in st.session_state["hist_bsp_list"]:
                             st.session_state["hist_bsp_list"].remove(tuple(_rp))
 
-            c1,c2 = st.columns(2)
+            c1,c2,c3 = st.columns(3)
             with c1: _bsp_yr = st.slider("History (years)",1,8,5,key="hbsp_yr")
+            with c2: _bsp_as_spread = st.checkbox("Show as spread", False, key="hbsp_as_spread")
             _cut_bsp = pd.Timestamp.now() - pd.DateOffset(years=_bsp_yr)
             _fig_bsp = go.Figure()
             _bsp_series = {}
@@ -2106,13 +2158,28 @@ def page_historicals():
                 if not _bsprd.empty:
                     _bsp_series[f"{_a} → {_b} {basis_label}"] = _bsprd
 
-            for _i,(_lbl,_s) in enumerate(_bsp_series.items()):
-                _add_series(_fig_bsp, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
+            if _bsp_as_spread and len(_bsp_series) >= 2:
+                _bsk = list(_bsp_series.keys())
+                _bsc1, _bsc2 = st.columns(2)
+                with _bsc1: _bsp_s1 = st.selectbox("Series A", _bsk, index=0, key="hbsp_s1")
+                with _bsc2: _bsp_s2 = st.selectbox("Series B (subtract)", [k for k in _bsk if k != _bsp_s1], index=0, key="hbsp_s2")
+                if _bsp_s1 in _bsp_series and _bsp_s2 in _bsp_series:
+                    _cmb = (_bsp_series[_bsp_s1] - _bsp_series[_bsp_s2]).dropna()
+                    _fig_bsp.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
+                        name=f"{_bsp_s1}  v  {_bsp_s2}", line=dict(color=_sp_colors[0], width=1.8)))
+                    _fig_bsp.add_hline(y=_cmb.mean(), line=dict(color="#5a6577", dash="dash", width=1))
+                    _bsp_active = {f"{_bsp_s1}  v  {_bsp_s2}": _cmb}
+                else:
+                    _bsp_active = _bsp_series
+            else:
+                _bsp_active = _bsp_series
+                for _i,(_lbl,_s) in enumerate(_bsp_series.items()):
+                    _add_series(_fig_bsp, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
             _fig_bsp.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_bsp, _cut_bsp, f"{basis_label} Spread (bp)")
             if _bsp_series:
                 st.plotly_chart(_fig_bsp, use_container_width=True)
-                _chart_stats(_bsp_series, "bsp", "bp")
+                _chart_stats(_bsp_active, "bsp", "bp")
 
     # ════════════════════════════════════════════════════════════
     # TAB 6: BASIS BUTTERFLIES
@@ -2147,8 +2214,9 @@ def page_historicals():
                         if len(_rp)==3 and tuple(_rp) in st.session_state["hist_bbf_list"]:
                             st.session_state["hist_bbf_list"].remove(tuple(_rp))
 
-            c1,c2 = st.columns(2)
+            c1,c2,c3 = st.columns(3)
             with c1: _bf_yr = st.slider("History (years)",1,8,5,key="hbbf_yr")
+            with c2: _bf_as_spread = st.checkbox("Show as spread", False, key="hbbf_as_spread")
             _cut_bf = pd.Timestamp.now() - pd.DateOffset(years=_bf_yr)
             _fig_bf = go.Figure()
             _bf_series = {}
@@ -2162,13 +2230,28 @@ def page_historicals():
                 if not _bfly.empty:
                     _bf_series[f"{_w1}/{_bd}/{_w2}"] = _bfly
 
-            for _i,(_lbl,_s) in enumerate(_bf_series.items()):
-                _add_series(_fig_bf, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
+            if _bf_as_spread and len(_bf_series) >= 2:
+                _bfk = list(_bf_series.keys())
+                _bfc1, _bfc2 = st.columns(2)
+                with _bfc1: _bf_s1 = st.selectbox("Series A", _bfk, index=0, key="hbbf_s1")
+                with _bfc2: _bf_s2 = st.selectbox("Series B (subtract)", [k for k in _bfk if k != _bf_s1], index=0, key="hbbf_s2")
+                if _bf_s1 in _bf_series and _bf_s2 in _bf_series:
+                    _cmb = (_bf_series[_bf_s1] - _bf_series[_bf_s2]).dropna()
+                    _fig_bf.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
+                        name=f"{_bf_s1}  v  {_bf_s2}", line=dict(color=_sp_colors[0], width=1.8)))
+                    _fig_bf.add_hline(y=_cmb.mean(), line=dict(color="#5a6577", dash="dash", width=1))
+                    _bf_active = {f"{_bf_s1}  v  {_bf_s2}": _cmb}
+                else:
+                    _bf_active = _bf_series
+            else:
+                _bf_active = _bf_series
+                for _i,(_lbl,_s) in enumerate(_bf_series.items()):
+                    _add_series(_fig_bf, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
             _fig_bf.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_bf, _cut_bf, f"{basis_label} Fly (bp)")
             if _bf_series:
                 st.plotly_chart(_fig_bf, use_container_width=True)
-                _chart_stats(_bf_series, "bbf", "bp")
+                _chart_stats(_bf_active, "bbf", "bp")
 
 
 # ============================================================================
