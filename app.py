@@ -690,15 +690,6 @@ def page_swap_rates():
     # Raw data
     with st.expander("📋 Raw Data"):
         st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    # Download
-    csv = df.to_csv(index=False)
-    st.download_button(
-        "📥 Download CSV",
-        csv,
-        f"swap_rates_{currency}_{datetime.now().strftime('%Y%m%d')}.csv",
-        "text/csv"
-    )
 
 def page_benchmark_rates():
     """Benchmark rates & central banks page"""
@@ -772,15 +763,6 @@ def page_benchmark_rates():
             st.dataframe(pivot, use_container_width=True, hide_index=True)
         else:
             st.info("No data")
-    
-    # Download
-    csv = df.to_csv(index=False)
-    st.download_button(
-        "📥 Download CSV",
-        csv,
-        f"benchmark_rates_{currency}_{datetime.now().strftime('%Y%m%d')}.csv",
-        "text/csv"
-    )
 
 def page_basis_swaps():
     """Basis swaps page"""
@@ -885,15 +867,6 @@ def page_basis_swaps():
     # Raw data
     with st.expander("📋 Raw Data"):
         st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    # Download
-    csv = df.to_csv(index=False)
-    st.download_button(
-        "📥 Download CSV",
-        csv,
-        f"basis_swaps_{currency}_{datetime.now().strftime('%Y%m%d')}.csv",
-        "text/csv"
-    )
 
 def page_charts():
     """Historical charts page"""
@@ -1012,24 +985,9 @@ VALID_TENORS_ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
     '12Y','15Y','20Y','25Y','30Y','35Y','40Y','45Y','50Y','60Y']
 
 def page_download():
-    """Data download page with filters."""
-    st.header("⬇️ Data Download")
-    
-    # Admin password gate
-    if "dl_unlocked" not in st.session_state:
-        st.session_state.dl_unlocked = False
-    
-    if not st.session_state.dl_unlocked:
-        st.info("Data downloads require admin access.")
-        with st.form("dl_auth"):
-            pwd = st.text_input("Admin Password", type="password")
-            if st.form_submit_button("Unlock"):
-                if pwd == "RateEdge2026DL":
-                    st.session_state.dl_unlocked = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password.")
-        return
+    """Data explorer page with filters — preview only, no download."""
+    st.header("⬇️ Data Explorer")
+    st.info("📋 Data is available for preview only. For bulk data access, please contact **will@rateedge.au** to request an API key.")
 
     # Dataset selector
     dataset = st.radio("Dataset", ["Swap Rates", "Benchmarks", "Basis Swaps"], horizontal=True, key="dl_dataset")
@@ -1093,12 +1051,11 @@ def _download_swap_rates():
             date_to = None
 
     # Format
-    fmt = st.radio("Format", ["CSV", "JSON"], horizontal=True, key="dl_sr_fmt")
 
     st.markdown("---")
 
-    # Preview & Download
-    if st.button("🔍 Preview & Download", type="primary", use_container_width=True, key="dl_sr_btn"):
+    # Preview
+    if st.button("🔍 Preview Data", type="primary", use_container_width=True, key="dl_sr_btn"):
         if not ccys or not frs or not tenors:
             st.error("Select at least one currency, floating rate, and tenor.")
             return
@@ -1144,16 +1101,6 @@ def _download_swap_rates():
         if len(df) > 100:
             st.caption(f"Showing first 100 of {len(df):,} records")
 
-        # Download button
-        if fmt == "CSV":
-            csv_data = df.to_csv(index=False)
-            st.download_button("⬇️ Download CSV", csv_data, "rateedge_swap_rates.csv", "text/csv",
-                             use_container_width=True, key="dl_sr_csv")
-        else:
-            json_data = df.to_json(orient="records", date_format="iso")
-            st.download_button("⬇️ Download JSON", json_data, "rateedge_swap_rates.json", "application/json",
-                             use_container_width=True, key="dl_sr_json")
-
 
 def _download_benchmarks():
     """Benchmarks download with filters."""
@@ -1189,11 +1136,10 @@ def _download_benchmarks():
         else:
             date_to = None
 
-    fmt = st.radio("Format", ["CSV", "JSON"], horizontal=True, key="dl_bm_fmt")
 
     st.markdown("---")
 
-    if st.button("🔍 Preview & Download", type="primary", use_container_width=True, key="dl_bm_btn"):
+    if st.button("🔍 Preview Data", type="primary", use_container_width=True, key="dl_bm_btn"):
         if not ccys or not rts:
             st.error("Select at least one currency and rate type.")
             return
@@ -1236,15 +1182,6 @@ def _download_benchmarks():
         st.dataframe(df.head(100), use_container_width=True, height=400)
         if len(df) > 100:
             st.caption(f"Showing first 100 of {len(df):,} records")
-
-        if fmt == "CSV":
-            csv_data = df.to_csv(index=False)
-            st.download_button("⬇️ Download CSV", csv_data, "rateedge_benchmarks.csv", "text/csv",
-                             use_container_width=True, key="dl_bm_csv")
-        else:
-            json_data = df.to_json(orient="records", date_format="iso")
-            st.download_button("⬇️ Download JSON", json_data, "rateedge_benchmarks.json", "application/json",
-                             use_container_width=True, key="dl_bm_json")
 
 
 def _download_basis():
@@ -1281,11 +1218,10 @@ def _download_basis():
         else:
             date_to = None
 
-    fmt = st.radio("Format", ["CSV", "JSON"], horizontal=True, key="dl_bs_fmt")
 
     st.markdown("---")
 
-    if st.button("🔍 Preview & Download", type="primary", use_container_width=True, key="dl_bs_btn"):
+    if st.button("🔍 Preview Data", type="primary", use_container_width=True, key="dl_bs_btn"):
         if not ccys or not rts:
             st.error("Select at least one currency and rate type.")
             return
@@ -1328,15 +1264,6 @@ def _download_basis():
         st.dataframe(df.head(100), use_container_width=True, height=400)
         if len(df) > 100:
             st.caption(f"Showing first 100 of {len(df):,} records")
-
-        if fmt == "CSV":
-            csv_data = df.to_csv(index=False)
-            st.download_button("⬇️ Download CSV", csv_data, "rateedge_basis.csv", "text/csv",
-                             use_container_width=True, key="dl_bs_csv")
-        else:
-            json_data = df.to_json(orient="records", date_format="iso")
-            st.download_button("⬇️ Download JSON", json_data, "rateedge_basis.json", "application/json",
-                             use_container_width=True, key="dl_bs_json")
 
 
 def page_about():
@@ -2270,7 +2197,7 @@ def main():
         page = st.radio(
             "Navigation",
             ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts",
-             "🔥 Forward Matrix's", "📐 Historical Rate Analysis", "⬇️ Download", "ℹ️ About"],
+             "🔥 Forward Matrix's", "📐 Historical Rate Analysis", "⬇️ Data Explorer", "ℹ️ About"],
             label_visibility="collapsed"
         )
         
@@ -2295,7 +2222,7 @@ def main():
         page_fwd_matrices()
     elif page == "📐 Historical Rate Analysis":
         page_historicals()
-    elif page == "⬇️ Download":
+    elif page == "⬇️ Data Explorer":
         page_download()
     elif page == "ℹ️ About":
         page_about()
