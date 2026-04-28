@@ -758,7 +758,7 @@ def page_basis_swaps():
     
     st.markdown("""
     **Available Basis Swaps:**
-    - **AUD**: 3v1 (3M BBSW vs 1M OIS), 6v3 (6M BBSW vs 3M BBSW)
+    - **AUD**: 3v1 (3M BBSW vs 1M BBSW), 6v3 (6M BBSW vs 3M BBSW)
     - **USD**: SOFR vs Fed Funds
     """)
     
@@ -1479,6 +1479,7 @@ def page_fwd_matrices():
         qq_x, qq_y, qq_dt = _get_par_curve("AUD", "3M BBSW", _as_of)
         ss_x, ss_y, ss_dt = _get_par_curve("AUD", "6M BBSW", _as_of)
         ois_x, ois_y, ois_dt = _get_par_curve("AUD", "AONIA", _as_of)
+        bbsw1m_x, bbsw1m_y, bbsw1m_dt = _get_par_curve("AUD", "1M BBSW", _as_of)
 
         if ss_x is None:
             st.error("No 6M BBSW data found.")
@@ -1536,13 +1537,13 @@ def page_fwd_matrices():
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
 
         elif _fm_tab == "3v1 Basis":
-            if qq_x is None or ois_x is None:
-                st.error("Need both 3M BBSW and AONIA data.")
+            if qq_x is None or bbsw1m_x is None:
+                st.error("Need both 3M BBSW and 1M BBSW data.")
             else:
                 m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
-                m_ois = _compute_fwd_matrix(ois_x, ois_y, EXPIRY_YEARS, TENOR_YEARS)
-                basis = [[(q - o) * 100 for q, o in zip(qr, orow)] for qr, orow in zip(m_qq, m_ois)]
-                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp) — Quarterly (3M) fwd − OIS (AONIA) fwd",
+                m_1m = _compute_fwd_matrix(bbsw1m_x, bbsw1m_y, EXPIRY_YEARS, TENOR_YEARS)
+                basis = [[(q - m) * 100 for q, m in zip(qr, mrow)] for qr, mrow in zip(m_qq, m_1m)]
+                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp) — Quarterly (3M BBSW) fwd − Monthly (1M BBSW) fwd",
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
 
     elif ccy == "USD":
