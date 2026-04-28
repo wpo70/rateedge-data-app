@@ -785,7 +785,7 @@ def page_basis_swaps():
     st.info(f"Showing {len(df):,} records from last {days} days")
     
     # Tenor order for sorting
-    tenor_order = ['3M', '6M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y']
+    tenor_order = ['3M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
     
     # Parse basis type and tenor from rate_type
     def parse_basis(rate_type):
@@ -806,9 +806,8 @@ def page_basis_swaps():
                 continue
             
             with st.expander(f"🔹 {ccy}", expanded=True):
-                # Get latest date
-                latest_date = ccy_df['date'].max()
-                latest = ccy_df[ccy_df['date'] == latest_date].copy()
+                # Get latest value per rate_type (handles different max dates per basis type)
+                latest = ccy_df.sort_values('date').groupby('rate_type').tail(1).copy()
                 
                 latest[['basis_type', 'tenor']] = latest['rate_type'].apply(lambda x: pd.Series(parse_basis(x)))
                 
@@ -831,8 +830,7 @@ def page_basis_swaps():
                 st.dataframe(pivot, use_container_width=True)
     else:
         ccy_df = df.copy()
-        latest_date = ccy_df['date'].max()
-        latest = ccy_df[ccy_df['date'] == latest_date].copy()
+        latest = ccy_df.sort_values('date').groupby('rate_type').tail(1).copy()
         
         latest[['basis_type', 'tenor']] = latest['rate_type'].apply(lambda x: pd.Series(parse_basis(x)))
         
