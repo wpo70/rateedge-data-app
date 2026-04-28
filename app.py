@@ -1238,7 +1238,7 @@ def page_fwd_matrices():
             z=z, x=tenor_labels, y=exp_labels,
             text=text, texttemplate="%{text}", textfont=dict(size=10),
             colorscale=colorscale, showscale=True,
-            colorbar=dict(title=unit, titlefont=dict(color="#94a3b8"), tickfont=dict(color="#94a3b8")),
+            colorbar=dict(title=dict(text=unit, font=dict(color="#94a3b8")), tickfont=dict(color="#94a3b8")),
         ))
         fig.update_layout(
             title=title, height=max(500, len(exp_labels) * 26),
