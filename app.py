@@ -434,16 +434,26 @@ def get_basis_swaps(currency: str = None, days: int = 30):
     return run_query(query, params)
 
 @st.cache_data(ttl=300)
-def get_latest_rates(currency: str):
-    """Get latest rates for a currency"""
-    query = """
-        SELECT DISTINCT ON (tenor, floating_rate) 
-            date, currency, tenor, rate, floating_rate
-        FROM swap_rates
-        WHERE currency = %s
-        ORDER BY tenor, floating_rate, date DESC
-    """
-    return run_query(query, [currency])
+def get_latest_rates(currency: str, as_of_date=None):
+    """Get latest rates for a currency, optionally as of a specific date"""
+    if as_of_date:
+        query = """
+            SELECT DISTINCT ON (tenor, floating_rate) 
+                date, currency, tenor, rate, floating_rate
+            FROM swap_rates
+            WHERE currency = %s AND date <= %s
+            ORDER BY tenor, floating_rate, date DESC
+        """
+        return run_query(query, [currency, as_of_date])
+    else:
+        query = """
+            SELECT DISTINCT ON (tenor, floating_rate) 
+                date, currency, tenor, rate, floating_rate
+            FROM swap_rates
+            WHERE currency = %s
+            ORDER BY tenor, floating_rate, date DESC
+        """
+        return run_query(query, [currency])
 
 @st.cache_data(ttl=300)
 def get_available_currencies():
@@ -488,9 +498,9 @@ def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int =
     _pro_layout(fig, f"{currency} {tenor} {floating_rate} Rate History", show_legend=False)
     st.plotly_chart(fig, use_container_width=True)
 
-def render_curve(currency: str):
-    """Render current swap curve"""
-    df = get_latest_rates(currency)
+def render_curve(currency: str, as_of_date=None):
+    """Render swap curve, optionally as of a specific date"""
+    df = get_latest_rates(currency, as_of_date)
     
     if df.empty:
         st.info(f"No curve data for {currency}")
@@ -537,7 +547,8 @@ def render_curve(currency: str):
     
     ordered_tenors = [t for t in tenor_order if t in all_tenors_used]
     
-    _pro_layout(fig, f"{currency} Swap Curve (Latest)", height=420)
+    curve_date = as_of_date.strftime('%d %b %Y') if as_of_date else "Latest"
+    _pro_layout(fig, f"{currency} Swap Curve ({curve_date})", height=420)
     fig.update_xaxes(type='category', categoryorder='array', categoryarray=ordered_tenors)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -574,11 +585,16 @@ def page_dashboard():
     st.markdown("""<h3 style="color:#5a6577; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
         text-transform:uppercase; margin-bottom:1rem;">Swap Curves</h3>""", unsafe_allow_html=True)
     
+    col_date, col_spacer = st.columns([1, 3])
+    with col_date:
+        curve_date = st.date_input("Curve Date", value=None, key="dash_curve_date",
+                                   help="Leave blank for latest available")
+    
     tabs = st.tabs(currencies)
     
     for i, ccy in enumerate(currencies):
         with tabs[i]:
-            render_curve(ccy)
+            render_curve(ccy, as_of_date=curve_date)
 
 def page_swap_rates():
     """Swap rates page"""
