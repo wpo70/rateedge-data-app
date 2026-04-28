@@ -821,6 +821,326 @@ def page_charts():
             )
             st.plotly_chart(fig, use_container_width=True)
 
+# ============================================================================
+# DOWNLOAD PAGE
+# ============================================================================
+
+VALID_TENORS_ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
+    '1Y','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
+    '12Y','15Y','20Y','25Y','30Y','35Y','40Y','45Y','50Y','60Y']
+
+def page_download():
+    """Data download page with filters."""
+    st.header("⬇️ Data Download")
+
+    # Dataset selector
+    dataset = st.radio("Dataset", ["Swap Rates", "Benchmarks", "Basis Swaps"], horizontal=True, key="dl_dataset")
+
+    st.markdown("---")
+
+    if dataset == "Swap Rates":
+        _download_swap_rates()
+    elif dataset == "Benchmarks":
+        _download_benchmarks()
+    elif dataset == "Basis Swaps":
+        _download_basis()
+
+
+def _download_swap_rates():
+    """Swap rates download with filters."""
+    # Get available options from DB
+    ccy_df = run_query("SELECT DISTINCT currency FROM swap_rates ORDER BY currency")
+    all_ccys = ccy_df['currency'].tolist() if not ccy_df.empty else ["AUD"]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        ccys = st.multiselect("Currencies", all_ccys, default=all_ccys, key="dl_sr_ccy")
+    with col2:
+        # Get floating rates for selected currencies
+        if ccys:
+            fr_df = run_query(
+                "SELECT DISTINCT floating_rate FROM swap_rates WHERE currency IN %s ORDER BY floating_rate",
+                [tuple(ccys)])
+            all_frs = fr_df['floating_rate'].tolist() if not fr_df.empty else []
+        else:
+            all_frs = []
+        frs = st.multiselect("Floating Rates", all_frs, default=all_frs, key="dl_sr_fr")
+
+    # Tenors
+    if ccys:
+        tn_df = run_query(
+            "SELECT DISTINCT tenor FROM swap_rates WHERE currency IN %s AND tenor IN %s ORDER BY tenor",
+            [tuple(ccys), tuple(VALID_TENORS_ORDERED)])
+        available_tenors = [t for t in VALID_TENORS_ORDERED if t in (tn_df['tenor'].tolist() if not tn_df.empty else [])]
+    else:
+        available_tenors = VALID_TENORS_ORDERED
+
+    tenors = st.multiselect("Tenors", available_tenors, default=available_tenors, key="dl_sr_tn")
+
+    # Date range
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        date_mode = st.radio("Date Selection", ["Date Range", "Single Date", "Latest Only"], horizontal=True, key="dl_sr_dm")
+    with col2:
+        if date_mode == "Date Range":
+            date_from = st.date_input("From", value=datetime.now().date() - timedelta(days=90), key="dl_sr_df")
+        elif date_mode == "Single Date":
+            date_from = st.date_input("Date", value=datetime.now().date(), key="dl_sr_sd")
+        else:
+            date_from = None
+    with col3:
+        if date_mode == "Date Range":
+            date_to = st.date_input("To", value=datetime.now().date(), key="dl_sr_dt")
+        else:
+            date_to = None
+
+    # Format
+    fmt = st.radio("Format", ["CSV", "JSON"], horizontal=True, key="dl_sr_fmt")
+
+    st.markdown("---")
+
+    # Preview & Download
+    if st.button("🔍 Preview & Download", type="primary", use_container_width=True, key="dl_sr_btn"):
+        if not ccys or not frs or not tenors:
+            st.error("Select at least one currency, floating rate, and tenor.")
+            return
+
+        conditions = ["currency IN %s", "floating_rate IN %s", "tenor IN %s"]
+        params = [tuple(ccys), tuple(frs), tuple(tenors)]
+
+        if date_mode == "Latest Only":
+            query = f"""
+                SELECT DISTINCT ON (currency, tenor, floating_rate)
+                    date, currency, tenor, floating_rate, rate
+                FROM swap_rates
+                WHERE {' AND '.join(conditions)}
+                ORDER BY currency, tenor, floating_rate, date DESC
+            """
+        else:
+            if date_mode == "Single Date":
+                conditions.append("date = %s")
+                params.append(str(date_from))
+            else:
+                conditions.append("date >= %s")
+                conditions.append("date <= %s")
+                params.append(str(date_from))
+                params.append(str(date_to))
+
+            query = f"""
+                SELECT date, currency, tenor, floating_rate, rate
+                FROM swap_rates
+                WHERE {' AND '.join(conditions)}
+                ORDER BY date DESC, currency, tenor, floating_rate
+            """
+
+        df = run_query(query, params)
+
+        if df.empty:
+            st.warning("No data found for the selected filters.")
+            return
+
+        st.success(f"✅ {len(df):,} records found")
+
+        # Preview
+        st.dataframe(df.head(100), use_container_width=True, height=400)
+        if len(df) > 100:
+            st.caption(f"Showing first 100 of {len(df):,} records")
+
+        # Download button
+        if fmt == "CSV":
+            csv_data = df.to_csv(index=False)
+            st.download_button("⬇️ Download CSV", csv_data, "rateedge_swap_rates.csv", "text/csv",
+                             use_container_width=True, key="dl_sr_csv")
+        else:
+            json_data = df.to_json(orient="records", date_format="iso")
+            st.download_button("⬇️ Download JSON", json_data, "rateedge_swap_rates.json", "application/json",
+                             use_container_width=True, key="dl_sr_json")
+
+
+def _download_benchmarks():
+    """Benchmarks download with filters."""
+    ccy_df = run_query("SELECT DISTINCT currency FROM benchmark_rates WHERE rate_type NOT LIKE 'BASIS%%' AND rate_type NOT LIKE 'SOFR_FF_BASIS%%' ORDER BY currency")
+    all_ccys = ccy_df['currency'].tolist() if not ccy_df.empty else ["AUD"]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        ccys = st.multiselect("Currencies", all_ccys, default=all_ccys, key="dl_bm_ccy")
+    with col2:
+        if ccys:
+            rt_df = run_query(
+                "SELECT DISTINCT rate_type FROM benchmark_rates WHERE currency IN %s AND rate_type NOT LIKE 'BASIS%%' AND rate_type NOT LIKE 'SOFR_FF_BASIS%%' ORDER BY rate_type",
+                [tuple(ccys)])
+            all_rts = rt_df['rate_type'].tolist() if not rt_df.empty else []
+        else:
+            all_rts = []
+        rts = st.multiselect("Rate Types", all_rts, default=all_rts, key="dl_bm_rt")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        date_mode = st.radio("Date Selection", ["Date Range", "Single Date", "Latest Only"], horizontal=True, key="dl_bm_dm")
+    with col2:
+        if date_mode == "Date Range":
+            date_from = st.date_input("From", value=datetime.now().date() - timedelta(days=90), key="dl_bm_df")
+        elif date_mode == "Single Date":
+            date_from = st.date_input("Date", value=datetime.now().date(), key="dl_bm_sd")
+        else:
+            date_from = None
+    with col3:
+        if date_mode == "Date Range":
+            date_to = st.date_input("To", value=datetime.now().date(), key="dl_bm_dt")
+        else:
+            date_to = None
+
+    fmt = st.radio("Format", ["CSV", "JSON"], horizontal=True, key="dl_bm_fmt")
+
+    st.markdown("---")
+
+    if st.button("🔍 Preview & Download", type="primary", use_container_width=True, key="dl_bm_btn"):
+        if not ccys or not rts:
+            st.error("Select at least one currency and rate type.")
+            return
+
+        conditions = ["currency IN %s", "rate_type IN %s"]
+        params = [tuple(ccys), tuple(rts)]
+
+        if date_mode == "Latest Only":
+            query = f"""
+                SELECT DISTINCT ON (currency, rate_type)
+                    date, currency, rate_type, rate
+                FROM benchmark_rates
+                WHERE {' AND '.join(conditions)}
+                ORDER BY currency, rate_type, date DESC
+            """
+        else:
+            if date_mode == "Single Date":
+                conditions.append("date = %s")
+                params.append(str(date_from))
+            else:
+                conditions.append("date >= %s")
+                conditions.append("date <= %s")
+                params.append(str(date_from))
+                params.append(str(date_to))
+
+            query = f"""
+                SELECT date, currency, rate_type, rate
+                FROM benchmark_rates
+                WHERE {' AND '.join(conditions)}
+                ORDER BY date DESC, currency, rate_type
+            """
+
+        df = run_query(query, params)
+
+        if df.empty:
+            st.warning("No data found for the selected filters.")
+            return
+
+        st.success(f"✅ {len(df):,} records found")
+        st.dataframe(df.head(100), use_container_width=True, height=400)
+        if len(df) > 100:
+            st.caption(f"Showing first 100 of {len(df):,} records")
+
+        if fmt == "CSV":
+            csv_data = df.to_csv(index=False)
+            st.download_button("⬇️ Download CSV", csv_data, "rateedge_benchmarks.csv", "text/csv",
+                             use_container_width=True, key="dl_bm_csv")
+        else:
+            json_data = df.to_json(orient="records", date_format="iso")
+            st.download_button("⬇️ Download JSON", json_data, "rateedge_benchmarks.json", "application/json",
+                             use_container_width=True, key="dl_bm_json")
+
+
+def _download_basis():
+    """Basis swaps download."""
+    ccy_df = run_query("SELECT DISTINCT currency FROM benchmark_rates WHERE rate_type LIKE 'BASIS%%' OR rate_type LIKE 'SOFR_FF_BASIS%%' ORDER BY currency")
+    all_ccys = ccy_df['currency'].tolist() if not ccy_df.empty else ["AUD"]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        ccys = st.multiselect("Currencies", all_ccys, default=all_ccys, key="dl_bs_ccy")
+    with col2:
+        if ccys:
+            rt_df = run_query(
+                "SELECT DISTINCT rate_type FROM benchmark_rates WHERE currency IN %s AND (rate_type LIKE 'BASIS%%' OR rate_type LIKE 'SOFR_FF_BASIS%%') ORDER BY rate_type",
+                [tuple(ccys)])
+            all_rts = rt_df['rate_type'].tolist() if not rt_df.empty else []
+        else:
+            all_rts = []
+        rts = st.multiselect("Rate Types", all_rts, default=all_rts, key="dl_bs_rt")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        date_mode = st.radio("Date Selection", ["Date Range", "Single Date", "Latest Only"], horizontal=True, key="dl_bs_dm")
+    with col2:
+        if date_mode == "Date Range":
+            date_from = st.date_input("From", value=datetime.now().date() - timedelta(days=90), key="dl_bs_df")
+        elif date_mode == "Single Date":
+            date_from = st.date_input("Date", value=datetime.now().date(), key="dl_bs_sd")
+        else:
+            date_from = None
+    with col3:
+        if date_mode == "Date Range":
+            date_to = st.date_input("To", value=datetime.now().date(), key="dl_bs_dt")
+        else:
+            date_to = None
+
+    fmt = st.radio("Format", ["CSV", "JSON"], horizontal=True, key="dl_bs_fmt")
+
+    st.markdown("---")
+
+    if st.button("🔍 Preview & Download", type="primary", use_container_width=True, key="dl_bs_btn"):
+        if not ccys or not rts:
+            st.error("Select at least one currency and rate type.")
+            return
+
+        conditions = ["currency IN %s", "rate_type IN %s"]
+        params = [tuple(ccys), tuple(rts)]
+
+        if date_mode == "Latest Only":
+            query = f"""
+                SELECT DISTINCT ON (currency, rate_type)
+                    date, currency, rate_type, rate
+                FROM benchmark_rates
+                WHERE {' AND '.join(conditions)}
+                ORDER BY currency, rate_type, date DESC
+            """
+        else:
+            if date_mode == "Single Date":
+                conditions.append("date = %s")
+                params.append(str(date_from))
+            else:
+                conditions.append("date >= %s")
+                conditions.append("date <= %s")
+                params.append(str(date_from))
+                params.append(str(date_to))
+
+            query = f"""
+                SELECT date, currency, rate_type, rate
+                FROM benchmark_rates
+                WHERE {' AND '.join(conditions)}
+                ORDER BY date DESC, currency, rate_type
+            """
+
+        df = run_query(query, params)
+
+        if df.empty:
+            st.warning("No data found for the selected filters.")
+            return
+
+        st.success(f"✅ {len(df):,} records found")
+        st.dataframe(df.head(100), use_container_width=True, height=400)
+        if len(df) > 100:
+            st.caption(f"Showing first 100 of {len(df):,} records")
+
+        if fmt == "CSV":
+            csv_data = df.to_csv(index=False)
+            st.download_button("⬇️ Download CSV", csv_data, "rateedge_basis.csv", "text/csv",
+                             use_container_width=True, key="dl_bs_csv")
+        else:
+            json_data = df.to_json(orient="records", date_format="iso")
+            st.download_button("⬇️ Download JSON", json_data, "rateedge_basis.json", "application/json",
+                             use_container_width=True, key="dl_bs_json")
+
+
 def page_about():
     """About page"""
     st.header("ℹ️ About RateEdge Data")
@@ -1674,12 +1994,12 @@ def main():
         page = st.radio(
             "Navigation",
             ["🏠 Dashboard", "📊 Swap Rates", "📈 Benchmarks", "🔄 Basis Swaps", "📉 Charts",
-             "🔥 Forward Matrices", "📐 Historicals", "ℹ️ About"],
+             "🔥 Forward Matrices", "📐 Historicals", "⬇️ Download", "ℹ️ About"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v1.9")
+        st.caption("RateEdge Data Portal v2.0")
         st.caption("© 2026 RateEdge (Aust.)")
     
     # Route to page
@@ -1697,6 +2017,8 @@ def main():
         page_fwd_matrices()
     elif page == "📐 Historicals":
         page_historicals()
+    elif page == "⬇️ Download":
+        page_download()
     elif page == "ℹ️ About":
         page_about()
 
