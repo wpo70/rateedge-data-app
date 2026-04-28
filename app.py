@@ -22,6 +22,185 @@ st.set_page_config(
 )
 
 # ============================================================================
+# GLOBAL PROFESSIONAL THEME
+# ============================================================================
+
+THEME = {
+    "bg_dark": "#0b1120",
+    "bg_card": "#111827",
+    "bg_surface": "#1e293b",
+    "border": "#1e3a5f",
+    "text_primary": "#e2e8f0",
+    "text_secondary": "#94a3b8",
+    "text_muted": "#64748b",
+    "accent_red": "#dc2626",
+    "accent_blue": "#2563eb",
+    "accent_green": "#059669",
+    "accent_amber": "#d97706",
+    "grid": "#1e293b",
+    "series": ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#f43f5e", "#84cc16"],
+    "curve_colors": ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899"],
+}
+
+st.markdown("""
+<style>
+    /* ── Global ── */
+    .stApp { background: linear-gradient(180deg, #0b1120 0%, #0f172a 100%); }
+    
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0b1120 0%, #111827 100%);
+        border-right: 1px solid #1e3a5f;
+    }
+    section[data-testid="stSidebar"] .stRadio label {
+        color: #94a3b8 !important;
+        font-size: 0.9rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+    section[data-testid="stSidebar"] .stRadio label:hover {
+        background: rgba(37, 99, 235, 0.12);
+        color: #e2e8f0 !important;
+    }
+    section[data-testid="stSidebar"] .stRadio label[data-checked="true"],
+    section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label[aria-checked="true"] {
+        background: rgba(37, 99, 235, 0.2);
+        color: #60a5fa !important;
+    }
+    
+    /* ── Headers ── */
+    h1, h2, h3, h4 { 
+        color: #e2e8f0 !important; 
+        font-weight: 600 !important;
+        letter-spacing: -0.02em;
+    }
+    h1 { border-bottom: 2px solid #1e3a5f; padding-bottom: 0.5rem; }
+    
+    /* ── Cards / Metrics ── */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #111827, #1e293b);
+        border: 1px solid #1e3a5f;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    div[data-testid="stMetric"] label { color: #94a3b8 !important; font-size: 0.85rem; }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #e2e8f0 !important; font-weight: 700; }
+    
+    /* ── Dataframes ── */
+    .stDataFrame { border: 1px solid #1e3a5f; border-radius: 8px; overflow: hidden; }
+    
+    /* ── Buttons ── */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+        border: none !important;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+    }
+    .stButton > button[kind="secondary"] {
+        background: #1e293b !important;
+        border: 1px solid #334155 !important;
+        color: #94a3b8 !important;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        background: #334155 !important;
+        color: #e2e8f0 !important;
+    }
+    
+    /* ── Inputs ── */
+    .stSelectbox, .stMultiSelect, .stTextInput, .stDateInput {
+        font-size: 0.9rem;
+    }
+    
+    /* ── Tabs ── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+        background: #111827;
+        border-radius: 8px;
+        padding: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 6px;
+        color: #94a3b8;
+        font-weight: 500;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #1e293b !important;
+        color: #60a5fa !important;
+    }
+    
+    /* ── Expanders ── */
+    .streamlit-expanderHeader {
+        background: #111827;
+        border: 1px solid #1e3a5f;
+        border-radius: 8px;
+        color: #94a3b8 !important;
+    }
+    
+    /* ── Download buttons ── */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #059669, #047857) !important;
+        border: none !important;
+        color: white !important;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+    }
+    .stDownloadButton > button:hover {
+        background: linear-gradient(135deg, #10b981, #059669) !important;
+        box-shadow: 0 4px 16px rgba(5, 150, 105, 0.4);
+    }
+    
+    /* ── Success/Info/Warning boxes ── */
+    .stAlert { border-radius: 8px; }
+    
+    /* ── Radio horizontal ── */
+    .stRadio > div { gap: 0.5rem; }
+    
+    /* ── Dividers ── */
+    hr { border-color: #1e3a5f !important; opacity: 0.5; }
+    
+    /* ── Captions ── */
+    .stCaption, small { color: #64748b !important; }
+</style>
+""", unsafe_allow_html=True)
+
+# ── Chart layout template ──
+def _pro_layout(fig, title=None, yaxis_title="Rate (%)", height=460, show_legend=True):
+    """Apply professional chart layout."""
+    fig.update_layout(
+        title=dict(text=title, font=dict(color="#e2e8f0", size=16, family="Inter, sans-serif"), x=0.01) if title else None,
+        height=height,
+        margin=dict(l=55, r=25, t=50 if title else 30, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(11,17,32,0.7)",
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="#1e293b", font_color="#e2e8f0", font_size=12, bordercolor="#334155"),
+        legend=dict(
+            orientation="h", y=1.08, x=0.5, xanchor="center",
+            font=dict(color="#94a3b8", size=11),
+            bgcolor="rgba(0,0,0,0)",
+        ) if show_legend else dict(visible=False),
+        xaxis=dict(
+            gridcolor="#1e293b", gridwidth=1,
+            color="#94a3b8", tickfont=dict(size=10),
+            zeroline=False, showline=True, linecolor="#1e3a5f", linewidth=1,
+        ),
+        yaxis=dict(
+            title=yaxis_title, titlefont=dict(color="#94a3b8", size=12),
+            gridcolor="#1e293b", gridwidth=1,
+            color="#94a3b8", tickfont=dict(size=10),
+            zeroline=False, showline=True, linecolor="#1e3a5f", linewidth=1,
+        ),
+        font=dict(color="#94a3b8", family="Inter, sans-serif"),
+    )
+
+# ============================================================================
 # AUTHENTICATION
 # ============================================================================
 
@@ -55,24 +234,26 @@ def verify_otp(email: str, code: str):
 def render_logo():
     """Render RateEdge logo"""
     st.markdown("""
-    <div style="text-align: center; padding: 2rem 0 1rem 0;">
-        <div style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;">
-            <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span>
+    <div style="text-align: center; padding: 3rem 0 1.5rem 0;">
+        <div style="font-size: 2.8rem; font-weight: 800; letter-spacing: -0.03em; font-family: Inter, sans-serif;">
+            <span style="color: #e2e8f0;">Rate</span><span style="color: #dc2626;">Edge</span>
         </div>
-        <div style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;">
-            AUD • NZD • USD Interest Rate Data
+        <div style="color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; letter-spacing: 0.15em; text-transform: uppercase;">
+            Interest Rate Data Platform
         </div>
+        <div style="width: 60px; height: 2px; background: linear-gradient(90deg, #dc2626, #2563eb); margin: 1rem auto 0;"></div>
     </div>
     """, unsafe_allow_html=True)
 
 def render_sidebar_logo():
     """Render logo for sidebar"""
     st.markdown("""
-    <div style="text-align: center; padding: 0.5rem 0;">
-        <div style="font-size: 1.3rem; font-weight: 700;">
-            <span style="color: #1e3a5f;">Rate</span><span style="color: #ef4444;">Edge</span>
+    <div style="text-align: center; padding: 0.75rem 0 0.25rem 0;">
+        <div style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.03em; font-family: Inter, sans-serif;">
+            <span style="color: #e2e8f0;">Rate</span><span style="color: #dc2626;">Edge</span>
         </div>
-        <div style="color: #64748b; font-size: 0.7rem;">DATA PORTAL</div>
+        <div style="color: #64748b; font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; margin-top: 2px;">DATA PORTAL</div>
+        <div style="width: 40px; height: 1px; background: linear-gradient(90deg, #dc2626, #2563eb); margin: 0.5rem auto 0;"></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -273,20 +454,14 @@ def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int =
         st.info("No historical data available")
         return
     
-    # Display name for floating rate
-    display_name = floating_rate
-    
-    fig = px.line(
-        df, x='date', y='rate',
-        title=f"{currency} {tenor} {display_name} Rate History",
-        labels={'date': 'Date', 'rate': 'Rate (%)'}
-    )
-    fig.update_layout(
-        hovermode='x unified',
-        xaxis_title="",
-        yaxis_title="Rate (%)",
-        height=400
-    )
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df['date'], y=df['rate'], mode='lines',
+        name=f"{currency} {tenor} {floating_rate}",
+        line=dict(color=THEME["accent_blue"], width=2),
+        fill='tozeroy', fillcolor='rgba(37, 99, 235, 0.06)',
+    ))
+    _pro_layout(fig, f"{currency} {tenor} {floating_rate} Rate History", show_legend=False)
     st.plotly_chart(fig, use_container_width=True)
 
 def render_curve(currency: str):
@@ -297,41 +472,26 @@ def render_curve(currency: str):
         st.info(f"No curve data for {currency}")
         return
     
-    # Get unique floating rates
     floating_rates = df['floating_rate'].unique()
     
-    # Tenor ordering with proper labels
     tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
                    '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
-    # Filter to only include valid tenors (string format like 1M, 5Y etc)
-    valid_tenors = [t for t in tenor_order]
     df_filtered = df[df['tenor'].str.upper().isin([t.upper() for t in tenor_order])].copy()
     
     if df_filtered.empty:
         st.warning(f"No standard tenor data for {currency}")
         return
     
-    # Colors for lines - distinct and visible
-    colors = ['#2563eb', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899']
-    # Blue, Green, Red, Orange, Purple, Pink
-    
     fig = go.Figure()
-    
-    # Collect all tenors used across all floating rates for x-axis ordering
     all_tenors_used = set()
     
     for idx, fr in enumerate(floating_rates):
         subset = df_filtered[df_filtered['floating_rate'] == fr].copy()
-        
         if subset.empty:
             continue
         
-        # Use original floating rate name
-        display_name = fr
-        
-        # Sort by tenor order
         def get_tenor_order(t):
             t_upper = t.upper() if isinstance(t, str) else str(t).upper()
             if t_upper in [x.upper() for x in tenor_order]:
@@ -340,36 +500,21 @@ def render_curve(currency: str):
         
         subset['tenor_order'] = subset['tenor'].apply(get_tenor_order)
         subset = subset.sort_values('tenor_order')
-        
-        # Normalize tenor labels to uppercase
         subset['tenor_label'] = subset['tenor'].str.upper()
         all_tenors_used.update(subset['tenor_label'].tolist())
         
+        color = THEME["curve_colors"][idx % len(THEME["curve_colors"])]
         fig.add_trace(go.Scatter(
-            x=subset['tenor_label'],
-            y=subset['rate'],
-            mode='lines+markers',
-            name=display_name,
-            line=dict(color=colors[idx % len(colors)], width=2),
-            marker=dict(size=6)
+            x=subset['tenor_label'], y=subset['rate'],
+            mode='lines+markers', name=fr,
+            line=dict(color=color, width=2.5),
+            marker=dict(size=5, color=color, line=dict(color="#0b1120", width=1))
         ))
     
-    # Create ordered category list for x-axis
     ordered_tenors = [t for t in tenor_order if t in all_tenors_used]
     
-    fig.update_layout(
-        title=f"{currency} Swap Curve (Latest)",
-        xaxis_title="Tenor",
-        yaxis_title="Rate (%)",
-        hovermode='x unified',
-        height=450,
-        xaxis=dict(
-            type='category',
-            categoryorder='array',
-            categoryarray=ordered_tenors
-        )
-    )
-    
+    _pro_layout(fig, f"{currency} Swap Curve (Latest)", height=420)
+    fig.update_xaxes(type='category', categoryorder='array', categoryarray=ordered_tenors)
     st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
@@ -380,11 +525,10 @@ def page_dashboard():
     """Dashboard page"""
     render_logo()
     
-    # Get currencies from database
     currencies = get_available_currencies()
     
-    # Summary metrics
-    st.markdown("### 📊 Market Overview")
+    st.markdown("""<h3 style="color:#94a3b8; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
+        text-transform:uppercase; margin-bottom:1rem;">Market Overview</h3>""", unsafe_allow_html=True)
     
     cols = st.columns(len(currencies))
     
@@ -392,7 +536,6 @@ def page_dashboard():
         with cols[i]:
             df = get_latest_rates(ccy)
             if not df.empty:
-                # Get 5Y rate as headline
                 rate_5y = df[df['tenor'].str.upper() == '5Y']
                 if not rate_5y.empty:
                     rate = rate_5y.iloc[0]['rate']
@@ -404,8 +547,8 @@ def page_dashboard():
     
     st.markdown("---")
     
-    # Curves
-    st.markdown("### 📈 Swap Curves")
+    st.markdown("""<h3 style="color:#94a3b8; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
+        text-transform:uppercase; margin-bottom:1rem;">Swap Curves</h3>""", unsafe_allow_html=True)
     
     tabs = st.tabs(currencies)
     
@@ -813,11 +956,12 @@ def page_charts():
 
             fig.update_layout(
                 hovermode='x unified', xaxis_title="", height=460,
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.8)",
-                legend=dict(orientation="h", y=1.06, font=dict(color="#e2e8f0")),
-                xaxis=dict(gridcolor="#334155", color="#94a3b8"),
-                yaxis=dict(gridcolor="#334155", color="#94a3b8"),
-                font=dict(color="#94a3b8"),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(11,17,32,0.7)",
+                hoverlabel=dict(bgcolor="#1e293b", font_color="#e2e8f0", font_size=12, bordercolor="#334155"),
+                legend=dict(orientation="h", y=1.06, font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)"),
+                xaxis=dict(gridcolor="#1e293b", color="#94a3b8", showline=True, linecolor="#1e3a5f"),
+                yaxis=dict(gridcolor="#1e293b", color="#94a3b8", showline=True, linecolor="#1e3a5f"),
+                font=dict(color="#94a3b8", family="Inter, sans-serif"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1241,12 +1385,13 @@ def page_fwd_matrices():
             colorbar=dict(title=dict(text=unit, font=dict(color="#94a3b8")), tickfont=dict(color="#94a3b8")),
         ))
         fig.update_layout(
-            title=title, height=max(500, len(exp_labels) * 26),
+            title=dict(text=title, font=dict(color="#e2e8f0", size=16, family="Inter, sans-serif"), x=0.01),
+            height=max(500, len(exp_labels) * 26),
             margin=dict(l=60, r=20, t=50, b=40),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.8)",
-            xaxis=dict(title="Tenor", color="#94a3b8", side="top"),
-            yaxis=dict(title="Expiry", color="#94a3b8", autorange="reversed"),
-            font=dict(color="#94a3b8", size=11),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(11,17,32,0.7)",
+            xaxis=dict(title="Tenor", color="#94a3b8", side="top", showline=True, linecolor="#1e3a5f"),
+            yaxis=dict(title="Expiry", color="#94a3b8", autorange="reversed", showline=True, linecolor="#1e3a5f"),
+            font=dict(color="#94a3b8", size=11, family="Inter, sans-serif"),
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1497,13 +1642,18 @@ def page_historicals():
 
     def _fig_layout(fig, cut, ylab):
         fig.update_layout(
-            height=460, margin=dict(l=50,r=20,t=40,b=40),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.8)",
-            legend=dict(orientation="h", y=1.06, font=dict(color="#e2e8f0", size=12)),
+            height=460, margin=dict(l=55, r=25, t=40, b=40),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(11,17,32,0.7)",
+            hoverlabel=dict(bgcolor="#1e293b", font_color="#e2e8f0", font_size=12, bordercolor="#334155"),
+            legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center",
+                        font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)"),
             yaxis_title=ylab,
-            xaxis=dict(gridcolor="#334155", color="#94a3b8", range=[cut, pd.Timestamp.now()]),
-            yaxis=dict(gridcolor="#334155", color="#94a3b8"),
-            font=dict(color="#94a3b8"),
+            xaxis=dict(gridcolor="#1e293b", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
+                       showline=True, linecolor="#1e3a5f", linewidth=1,
+                       range=[cut, pd.Timestamp.now()]),
+            yaxis=dict(gridcolor="#1e293b", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
+                       showline=True, linecolor="#1e3a5f", linewidth=1),
+            font=dict(color="#94a3b8", family="Inter, sans-serif"),
         )
 
     def _add_series(fig, label, series, color, bands=False):
@@ -1983,8 +2133,9 @@ def main():
     with st.sidebar:
         render_sidebar_logo()
         
-        st.markdown(f"**👤 {st.session_state.get('username', 'User')}**")
-        if st.button("🚪 Logout", use_container_width=True):
+        st.markdown(f"""<div style="text-align:center; color:#94a3b8; font-size:0.8rem; margin:0.25rem 0 0.5rem 0;">
+            👤 {st.session_state.get('username', 'User')}</div>""", unsafe_allow_html=True)
+        if st.button("Logout", use_container_width=True, key="logout_btn"):
             st.session_state["authenticated"] = False
             st.session_state["username"] = None
             st.rerun()
@@ -1999,8 +2150,10 @@ def main():
         )
         
         st.markdown("---")
-        st.caption("RateEdge Data Portal v2.0")
-        st.caption("© 2026 RateEdge (Aust.)")
+        st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.1</div>
+            <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
+        </div>""", unsafe_allow_html=True)
     
     # Route to page
     if page == "🏠 Dashboard":
