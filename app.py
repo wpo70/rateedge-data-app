@@ -26,179 +26,184 @@ st.set_page_config(
 # ============================================================================
 
 THEME = {
-    "bg_dark": "#0b1120",
-    "bg_card": "#1a1f2e",
-    "bg_surface": "#222836",
-    "border": "#2a3040",
-    "text_primary": "#e2e8f0",
-    "text_secondary": "#94a3b8",
-    "text_muted": "#64748b",
-    "accent_red": "#dc2626",
-    "accent_blue": "#2563eb",
+    "bg_main": "#f8f9fb",
+    "bg_card": "#ffffff",
+    "bg_sidebar": "#0f1729",
+    "border": "#e2e5ea",
+    "border_dark": "#2a3040",
+    "text_primary": "#1a1f2e",
+    "text_secondary": "#5a6577",
+    "text_muted": "#8c95a4",
+    "accent_red": "#cc1a1a",
+    "accent_blue": "#1a3f7a",
     "accent_green": "#059669",
     "accent_amber": "#d97706",
-    "grid": "#222836",
-    "series": ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#f43f5e", "#84cc16"],
-    "curve_colors": ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899"],
+    "grid": "#eceef2",
+    "series": ["#1a3f7a", "#cc1a1a", "#059669", "#d97706", "#7c3aed", "#0891b2", "#e11d48", "#65a30d"],
+    "curve_colors": ["#1a3f7a", "#059669", "#cc1a1a", "#d97706", "#7c3aed", "#db2777"],
 }
 
 st.markdown("""
 <style>
-    /* ── Global ── */
-    .stApp { background: linear-gradient(180deg, #141921 0%, #1a1f2e 100%); }
+    /* ── Global — light main area ── */
+    .stApp { background: #f8f9fb !important; }
+    [data-testid="stAppViewContainer"] { background: #f8f9fb !important; }
+    [data-testid="stHeader"] { background: rgba(248,249,251,0.95) !important; }
     
-    /* ── Sidebar ── */
+    /* ── Sidebar — dark navy ── */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #141921 0%, #1a1f2e 100%);
-        border-right: 1px solid #2a3040;
+        background: linear-gradient(180deg, #0b1221 0%, #0f1729 100%) !important;
+        border-right: 1px solid #1e2a3e;
     }
+    section[data-testid="stSidebar"] * { color: #b0b8c8; }
     section[data-testid="stSidebar"] .stRadio label {
-        color: #94a3b8 !important;
-        font-size: 0.9rem;
-        padding: 0.35rem 0.75rem;
+        color: #8c95a4 !important;
+        font-size: 0.88rem;
+        padding: 0.4rem 0.75rem;
         border-radius: 6px;
-        transition: all 0.2s;
+        transition: all 0.15s;
     }
     section[data-testid="stSidebar"] .stRadio label:hover {
-        background: rgba(37, 99, 235, 0.12);
+        background: rgba(255,255,255,0.06);
         color: #e2e8f0 !important;
     }
-    section[data-testid="stSidebar"] .stRadio label[data-checked="true"],
     section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label[aria-checked="true"] {
-        background: rgba(37, 99, 235, 0.2);
-        color: #60a5fa !important;
+        background: rgba(255,255,255,0.1);
+        color: #ffffff !important;
+        border-left: 3px solid #cc1a1a;
     }
+    section[data-testid="stSidebar"] .stButton > button {
+        background: rgba(255,255,255,0.08) !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
+        color: #8c95a4 !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255,255,255,0.14) !important;
+        color: #e2e8f0 !important;
+    }
+    section[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,0.08) !important; }
     
     /* ── Headers ── */
     h1, h2, h3, h4 { 
-        color: #e2e8f0 !important; 
+        color: #1a1f2e !important; 
         font-weight: 600 !important;
         letter-spacing: -0.02em;
     }
-    h1 { border-bottom: 2px solid #2a3040; padding-bottom: 0.5rem; }
+    h1 { border-bottom: 2px solid #1a3f7a; padding-bottom: 0.5rem; }
     
     /* ── Cards / Metrics ── */
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #222836, #333a4a);
-        border: 1px solid #333a4a;
+        background: #ffffff;
+        border: 1px solid #e2e5ea;
         border-radius: 10px;
         padding: 1rem 1.25rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
-    div[data-testid="stMetric"] label { color: #94a3b8 !important; font-size: 0.85rem; }
-    div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #e2e8f0 !important; font-weight: 700; }
+    div[data-testid="stMetric"] label { color: #5a6577 !important; font-size: 0.85rem; }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #1a1f2e !important; font-weight: 700; }
     
     /* ── Dataframes ── */
-    .stDataFrame { border: 1px solid #2a3040; border-radius: 8px; overflow: hidden; }
+    .stDataFrame { border: 1px solid #e2e5ea; border-radius: 8px; overflow: hidden; }
     
     /* ── Buttons ── */
     .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+        background: #1a3f7a !important;
         border: none !important;
+        color: white !important;
         font-weight: 600;
         letter-spacing: 0.02em;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        box-shadow: 0 1px 4px rgba(26, 63, 122, 0.2);
     }
     .stButton > button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
-        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
+        background: #234d94 !important;
+        box-shadow: 0 2px 8px rgba(26, 63, 122, 0.3);
     }
     .stButton > button[kind="secondary"] {
-        background: #222836 !important;
-        border: 1px solid #333a4a !important;
-        color: #94a3b8 !important;
+        background: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        color: #5a6577 !important;
     }
     .stButton > button[kind="secondary"]:hover {
-        background: #333a4a !important;
-        color: #e2e8f0 !important;
+        background: #f3f4f6 !important;
+        color: #1a1f2e !important;
     }
     
     /* ── Inputs ── */
-    .stSelectbox, .stMultiSelect, .stTextInput, .stDateInput {
-        font-size: 0.9rem;
-    }
+    .stSelectbox, .stMultiSelect, .stTextInput, .stDateInput { font-size: 0.9rem; }
     
     /* ── Tabs ── */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px;
-        background: #1a1f2e;
+        background: #f0f1f4;
         border-radius: 8px;
         padding: 4px;
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 6px;
-        color: #94a3b8;
+        color: #5a6577;
         font-weight: 500;
     }
     .stTabs [aria-selected="true"] {
-        background: #222836 !important;
-        color: #60a5fa !important;
-    }
-    
-    /* ── Expanders ── */
-    .streamlit-expanderHeader {
-        background: #1a1f2e;
-        border: 1px solid #2a3040;
-        border-radius: 8px;
-        color: #94a3b8 !important;
+        background: #ffffff !important;
+        color: #1a3f7a !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
     
     /* ── Download buttons ── */
     .stDownloadButton > button {
-        background: linear-gradient(135deg, #059669, #047857) !important;
+        background: #059669 !important;
         border: none !important;
         color: white !important;
         font-weight: 600;
-        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
     }
     .stDownloadButton > button:hover {
-        background: linear-gradient(135deg, #10b981, #059669) !important;
-        box-shadow: 0 4px 16px rgba(5, 150, 105, 0.4);
+        background: #047857 !important;
     }
     
-    /* ── Success/Info/Warning boxes ── */
+    /* ── Alerts ── */
     .stAlert { border-radius: 8px; }
     
     /* ── Radio horizontal ── */
     .stRadio > div { gap: 0.5rem; }
     
     /* ── Dividers ── */
-    hr { border-color: #2a3040 !important; opacity: 0.5; }
+    hr { border-color: #e2e5ea !important; opacity: 0.7; }
     
-    /* ── Captions ── */
-    .stCaption, small { color: #64748b !important; }
+    /* ── Main content text ── */
+    p, span, label, .stMarkdown { color: #374151; }
+    .stCaption, small { color: #8c95a4 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Chart layout template ──
 def _pro_layout(fig, title=None, yaxis_title="Rate (%)", height=460, show_legend=True):
-    """Apply professional chart layout."""
+    """Apply professional chart layout — light theme."""
     layout_args = dict(
         height=height,
         margin=dict(l=55, r=25, t=50 if title else 30, b=40),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(22,26,38,0.7)",
+        plot_bgcolor="#ffffff",
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="#222836", font_color="#e2e8f0", font_size=12, bordercolor="#333a4a"),
+        hoverlabel=dict(bgcolor="#ffffff", font_color="#1a1f2e", font_size=12, bordercolor="#e2e5ea"),
         xaxis=dict(
-            gridcolor="#222836", gridwidth=1,
-            color="#94a3b8", tickfont=dict(size=10),
-            zeroline=False, showline=True, linecolor="#2a3040", linewidth=1,
+            gridcolor="#eceef2", gridwidth=1,
+            color="#5a6577", tickfont=dict(size=10, color="#5a6577"),
+            zeroline=False, showline=True, linecolor="#d1d5db", linewidth=1,
         ),
         yaxis=dict(
-            title=dict(text=yaxis_title, font=dict(color="#94a3b8", size=12)),
-            gridcolor="#222836", gridwidth=1,
-            color="#94a3b8", tickfont=dict(size=10),
-            zeroline=False, showline=True, linecolor="#2a3040", linewidth=1,
+            title=dict(text=yaxis_title, font=dict(color="#5a6577", size=12)),
+            gridcolor="#eceef2", gridwidth=1,
+            color="#5a6577", tickfont=dict(size=10, color="#5a6577"),
+            zeroline=False, showline=True, linecolor="#d1d5db", linewidth=1,
         ),
-        font=dict(color="#94a3b8", family="Inter, sans-serif"),
+        font=dict(color="#374151", family="Inter, sans-serif"),
     )
     if title:
-        layout_args["title"] = dict(text=title, font=dict(color="#e2e8f0", size=16, family="Inter, sans-serif"), x=0.01)
+        layout_args["title"] = dict(text=title, font=dict(color="#1a1f2e", size=16, family="Inter, sans-serif"), x=0.01)
     if show_legend:
         layout_args["legend"] = dict(
             orientation="h", y=1.08, x=0.5, xanchor="center",
-            font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)")
+            font=dict(color="#5a6577", size=11), bgcolor="rgba(0,0,0,0)")
     else:
         layout_args["showlegend"] = False
     fig.update_layout(**layout_args)
@@ -456,7 +461,7 @@ def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int =
         x=df['date'], y=df['rate'], mode='lines',
         name=f"{currency} {tenor} {floating_rate}",
         line=dict(color=THEME["accent_blue"], width=2),
-        fill='tozeroy', fillcolor='rgba(37, 99, 235, 0.06)',
+        fill='tozeroy', fillcolor="rgba(26, 63, 122, 0.08)",
     ))
     _pro_layout(fig, f"{currency} {tenor} {floating_rate} Rate History", show_legend=False)
     st.plotly_chart(fig, use_container_width=True)
@@ -524,7 +529,7 @@ def page_dashboard():
     
     currencies = get_available_currencies()
     
-    st.markdown("""<h3 style="color:#94a3b8; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
+    st.markdown("""<h3 style="color:#5a6577; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
         text-transform:uppercase; margin-bottom:1rem;">Market Overview</h3>""", unsafe_allow_html=True)
     
     cols = st.columns(len(currencies))
@@ -544,7 +549,7 @@ def page_dashboard():
     
     st.markdown("---")
     
-    st.markdown("""<h3 style="color:#94a3b8; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
+    st.markdown("""<h3 style="color:#5a6577; font-weight:400; font-size:1.1rem; letter-spacing:0.05em; 
         text-transform:uppercase; margin-bottom:1rem;">Swap Curves</h3>""", unsafe_allow_html=True)
     
     tabs = st.tabs(currencies)
@@ -953,12 +958,12 @@ def page_charts():
 
             fig.update_layout(
                 hovermode='x unified', xaxis_title="", height=460,
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(22,26,38,0.7)",
-                hoverlabel=dict(bgcolor="#222836", font_color="#e2e8f0", font_size=12, bordercolor="#333a4a"),
-                legend=dict(orientation="h", y=1.06, font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)"),
-                xaxis=dict(gridcolor="#222836", color="#94a3b8", showline=True, linecolor="#2a3040"),
-                yaxis=dict(gridcolor="#222836", color="#94a3b8", showline=True, linecolor="#2a3040"),
-                font=dict(color="#94a3b8", family="Inter, sans-serif"),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#ffffff",
+                hoverlabel=dict(bgcolor="#ffffff", font_color="#1a1f2e", font_size=12, bordercolor="#e2e5ea"),
+                legend=dict(orientation="h", y=1.06, font=dict(color="#5a6577", size=11), bgcolor="rgba(0,0,0,0)"),
+                xaxis=dict(gridcolor="#eceef2", color="#5a6577", showline=True, linecolor="#d1d5db"),
+                yaxis=dict(gridcolor="#eceef2", color="#5a6577", showline=True, linecolor="#d1d5db"),
+                font=dict(color="#5a6577", family="Inter, sans-serif"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1412,16 +1417,16 @@ def page_fwd_matrices():
                 z=z, x=tenor_labels, y=exp_labels,
                 text=text, texttemplate="%{text}", textfont=dict(size=10),
                 colorscale=colorscale, showscale=True,
-                colorbar=dict(title=dict(text=unit, font=dict(color="#94a3b8")), tickfont=dict(color="#94a3b8")),
+                colorbar=dict(title=dict(text=unit, font=dict(color="#5a6577")), tickfont=dict(color="#5a6577")),
             ))
             fig.update_layout(
-                title=dict(text=title, font=dict(color="#e2e8f0", size=16, family="Inter, sans-serif"), x=0.01),
+                title=dict(text=title, font=dict(color="#1a1f2e", size=16, family="Inter, sans-serif"), x=0.01),
                 height=max(500, len(exp_labels) * 26),
                 margin=dict(l=60, r=20, t=50, b=40),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(22,26,38,0.7)",
-                xaxis=dict(title="Tenor", color="#94a3b8", side="top", showline=True, linecolor="#2a3040"),
-                yaxis=dict(title="Expiry", color="#94a3b8", autorange="reversed", showline=True, linecolor="#2a3040"),
-                font=dict(color="#94a3b8", size=11, family="Inter, sans-serif"),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#ffffff",
+                xaxis=dict(title="Tenor", color="#5a6577", side="top", showline=True, linecolor="#d1d5db"),
+                yaxis=dict(title="Expiry", color="#5a6577", autorange="reversed", showline=True, linecolor="#d1d5db"),
+                font=dict(color="#5a6577", size=11, family="Inter, sans-serif"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1432,23 +1437,23 @@ def page_fwd_matrices():
             fig = go.Figure(data=go.Surface(
                 z=z_rev, x=tenor_rev, y=exp_labels,
                 colorscale=colorscale, showscale=True,
-                colorbar=dict(title=dict(text=unit, font=dict(color="#94a3b8")), tickfont=dict(color="#94a3b8")),
+                colorbar=dict(title=dict(text=unit, font=dict(color="#5a6577")), tickfont=dict(color="#5a6577")),
                 contours=dict(
-                    z=dict(show=True, usecolormap=True, highlightcolor="#e2e8f0", project_z=True)
+                    z=dict(show=True, usecolormap=True, highlightcolor="#1a1f2e", project_z=True)
                 ),
             ))
             fig.update_layout(
-                title=dict(text=title, font=dict(color="#e2e8f0", size=16, family="Inter, sans-serif"), x=0.01),
+                title=dict(text=title, font=dict(color="#1a1f2e", size=16, family="Inter, sans-serif"), x=0.01),
                 height=650,
                 margin=dict(l=10, r=10, t=50, b=10),
                 paper_bgcolor="rgba(0,0,0,0)",
                 scene=dict(
-                    xaxis=dict(title="Tenor", color="#94a3b8", gridcolor="#333a4a", backgroundcolor="rgba(22,26,38,0.7)"),
-                    yaxis=dict(title="Expiry", color="#94a3b8", gridcolor="#333a4a", backgroundcolor="rgba(22,26,38,0.7)", autorange="reversed"),
-                    zaxis=dict(title=unit, color="#94a3b8", gridcolor="#333a4a", backgroundcolor="rgba(22,26,38,0.7)"),
+                    xaxis=dict(title="Tenor", color="#5a6577", gridcolor="#eceef2", backgroundcolor="#f8f9fb"),
+                    yaxis=dict(title="Expiry", color="#5a6577", gridcolor="#eceef2", backgroundcolor="#f8f9fb", autorange="reversed"),
+                    zaxis=dict(title=unit, color="#5a6577", gridcolor="#eceef2", backgroundcolor="#f8f9fb"),
                     camera=dict(eye=dict(x=2.0, y=-1.5, z=1.0)),
                 ),
-                font=dict(color="#94a3b8", family="Inter, sans-serif"),
+                font=dict(color="#5a6577", family="Inter, sans-serif"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1699,17 +1704,17 @@ def page_historicals():
     def _fig_layout(fig, cut, ylab):
         fig.update_layout(
             height=460, margin=dict(l=55, r=25, t=40, b=40),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(22,26,38,0.7)",
-            hoverlabel=dict(bgcolor="#222836", font_color="#e2e8f0", font_size=12, bordercolor="#333a4a"),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#ffffff",
+            hoverlabel=dict(bgcolor="#ffffff", font_color="#1a1f2e", font_size=12, bordercolor="#e2e5ea"),
             legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center",
-                        font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)"),
+                        font=dict(color="#5a6577", size=11), bgcolor="rgba(0,0,0,0)"),
             yaxis_title=ylab,
-            xaxis=dict(gridcolor="#222836", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
-                       showline=True, linecolor="#2a3040", linewidth=1,
+            xaxis=dict(gridcolor="#eceef2", gridwidth=1, color="#5a6577", tickfont=dict(size=10),
+                       showline=True, linecolor="#d1d5db", linewidth=1,
                        range=[cut, pd.Timestamp.now()]),
-            yaxis=dict(gridcolor="#222836", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
-                       showline=True, linecolor="#2a3040", linewidth=1),
-            font=dict(color="#94a3b8", family="Inter, sans-serif"),
+            yaxis=dict(gridcolor="#eceef2", gridwidth=1, color="#5a6577", tickfont=dict(size=10),
+                       showline=True, linecolor="#d1d5db", linewidth=1),
+            font=dict(color="#5a6577", family="Inter, sans-serif"),
         )
 
     def _add_series(fig, label, series, color, bands=False):
@@ -1831,7 +1836,7 @@ def page_historicals():
                 _cmb = (_sp_series[_s1] - _sp_series[_s2]).dropna()
                 _fig.add_trace(go.Scatter(x=_cmb.index, y=_cmb.values, mode="lines",
                     name=f"{_s1}  v  {_s2}", line=dict(color=_sp_colors[0], width=1.8)))
-                _fig.add_hline(y=_cmb.mean(), line=dict(color="#94a3b8", dash="dash", width=1))
+                _fig.add_hline(y=_cmb.mean(), line=dict(color="#5a6577", dash="dash", width=1))
                 _sp_active = {f"{_s1}  v  {_s2}": _cmb}
             else:
                 _sp_active = _sp_series
@@ -1893,7 +1898,7 @@ def page_historicals():
         for _i,(_l,_s) in enumerate(_fl_series.items()):
             _add_series(_fig_fl, _l, _s, _sp_colors[_i%len(_sp_colors)], _fl_bands)
         if _fl_series:
-            _fig_fl.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_fl.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_fl, _cut_fl, "Butterfly (bp)")
             st.plotly_chart(_fig_fl, use_container_width=True)
             _chart_stats(_fl_series, "fl", "bp")
@@ -1950,7 +1955,7 @@ def page_historicals():
                 _cmb=(_fv_series[_fv_s1]-_fv_series[_fv_s2]).dropna()*100
                 _fig_fv.add_trace(go.Scatter(x=_cmb.index,y=_cmb.values,mode="lines",
                     name=f"{_fv_s1} v {_fv_s2}",line=dict(color=_sp_colors[0],width=1.8)))
-                _fig_fv.add_hline(y=_cmb.mean(),line=dict(color="#94a3b8",dash="dash",width=1))
+                _fig_fv.add_hline(y=_cmb.mean(),line=dict(color="#5a6577",dash="dash",width=1))
                 _fv_active = {f"{_fv_s1} v {_fv_s2}": _cmb}
                 _fig_layout(_fig_fv, _cut_fv, "Spread (bp)")
             else:
@@ -2006,7 +2011,7 @@ def page_historicals():
                 if not _bs.empty:
                     _b_series[f"{_tn} {basis_label}"] = _bs
                     _add_series(_fig_b, f"{_tn} {basis_label}", _bs, _sp_colors[_i%len(_sp_colors)])
-            _fig_b.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_b.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_b, _cut_b, f"{basis_label} Basis (bp)")
             if _b_series:
                 st.plotly_chart(_fig_b, use_container_width=True)
@@ -2058,7 +2063,7 @@ def page_historicals():
 
         for _i,(_l,_b) in enumerate(_fvb_series.items()):
             _add_series(_fig_fvb, _l, _b, _sp_colors[_i%len(_sp_colors)])
-        _fig_fvb.add_hline(y=0, line=dict(color="#64748b", width=1))
+        _fig_fvb.add_hline(y=0, line=dict(color="#d1d5db", width=1))
         _fig_layout(_fig_fvb, _cut_fvb, f"{basis_label} Fwd-Fwd Basis (bp)")
         if _fvb_series:
             st.plotly_chart(_fig_fvb, use_container_width=True)
@@ -2112,7 +2117,7 @@ def page_historicals():
 
             for _i,(_lbl,_s) in enumerate(_bsp_series.items()):
                 _add_series(_fig_bsp, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
-            _fig_bsp.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_bsp.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_bsp, _cut_bsp, f"{basis_label} Spread (bp)")
             if _bsp_series:
                 st.plotly_chart(_fig_bsp, use_container_width=True)
@@ -2168,7 +2173,7 @@ def page_historicals():
 
             for _i,(_lbl,_s) in enumerate(_bf_series.items()):
                 _add_series(_fig_bf, _lbl, _s, _sp_colors[_i%len(_sp_colors)])
-            _fig_bf.add_hline(y=0, line=dict(color="#64748b", width=1))
+            _fig_bf.add_hline(y=0, line=dict(color="#d1d5db", width=1))
             _fig_layout(_fig_bf, _cut_bf, f"{basis_label} Fly (bp)")
             if _bf_series:
                 st.plotly_chart(_fig_bf, use_container_width=True)
@@ -2207,7 +2212,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.3</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.4</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
