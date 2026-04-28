@@ -27,9 +27,9 @@ st.set_page_config(
 
 THEME = {
     "bg_dark": "#0b1120",
-    "bg_card": "#111827",
-    "bg_surface": "#1e293b",
-    "border": "#1e3a5f",
+    "bg_card": "#1a1f2e",
+    "bg_surface": "#222836",
+    "border": "#2a3040",
     "text_primary": "#e2e8f0",
     "text_secondary": "#94a3b8",
     "text_muted": "#64748b",
@@ -37,7 +37,7 @@ THEME = {
     "accent_blue": "#2563eb",
     "accent_green": "#059669",
     "accent_amber": "#d97706",
-    "grid": "#1e293b",
+    "grid": "#222836",
     "series": ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#f43f5e", "#84cc16"],
     "curve_colors": ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#ec4899"],
 }
@@ -45,12 +45,12 @@ THEME = {
 st.markdown("""
 <style>
     /* ── Global ── */
-    .stApp { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); }
+    .stApp { background: linear-gradient(180deg, #141921 0%, #1a1f2e 100%); }
     
     /* ── Sidebar ── */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-        border-right: 1px solid #1e3a5f;
+        background: linear-gradient(180deg, #141921 0%, #1a1f2e 100%);
+        border-right: 1px solid #2a3040;
     }
     section[data-testid="stSidebar"] .stRadio label {
         color: #94a3b8 !important;
@@ -75,12 +75,12 @@ st.markdown("""
         font-weight: 600 !important;
         letter-spacing: -0.02em;
     }
-    h1 { border-bottom: 2px solid #1e3a5f; padding-bottom: 0.5rem; }
+    h1 { border-bottom: 2px solid #2a3040; padding-bottom: 0.5rem; }
     
     /* ── Cards / Metrics ── */
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #1e293b, #334155);
-        border: 1px solid #334155;
+        background: linear-gradient(135deg, #222836, #333a4a);
+        border: 1px solid #333a4a;
         border-radius: 10px;
         padding: 1rem 1.25rem;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
@@ -89,7 +89,7 @@ st.markdown("""
     div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #e2e8f0 !important; font-weight: 700; }
     
     /* ── Dataframes ── */
-    .stDataFrame { border: 1px solid #1e3a5f; border-radius: 8px; overflow: hidden; }
+    .stDataFrame { border: 1px solid #2a3040; border-radius: 8px; overflow: hidden; }
     
     /* ── Buttons ── */
     .stButton > button[kind="primary"] {
@@ -104,12 +104,12 @@ st.markdown("""
         box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);
     }
     .stButton > button[kind="secondary"] {
-        background: #1e293b !important;
-        border: 1px solid #334155 !important;
+        background: #222836 !important;
+        border: 1px solid #333a4a !important;
         color: #94a3b8 !important;
     }
     .stButton > button[kind="secondary"]:hover {
-        background: #334155 !important;
+        background: #333a4a !important;
         color: #e2e8f0 !important;
     }
     
@@ -121,7 +121,7 @@ st.markdown("""
     /* ── Tabs ── */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px;
-        background: #111827;
+        background: #1a1f2e;
         border-radius: 8px;
         padding: 4px;
     }
@@ -131,14 +131,14 @@ st.markdown("""
         font-weight: 500;
     }
     .stTabs [aria-selected="true"] {
-        background: #1e293b !important;
+        background: #222836 !important;
         color: #60a5fa !important;
     }
     
     /* ── Expanders ── */
     .streamlit-expanderHeader {
-        background: #111827;
-        border: 1px solid #1e3a5f;
+        background: #1a1f2e;
+        border: 1px solid #2a3040;
         border-radius: 8px;
         color: #94a3b8 !important;
     }
@@ -163,7 +163,7 @@ st.markdown("""
     .stRadio > div { gap: 0.5rem; }
     
     /* ── Dividers ── */
-    hr { border-color: #1e3a5f !important; opacity: 0.5; }
+    hr { border-color: #2a3040 !important; opacity: 0.5; }
     
     /* ── Captions ── */
     .stCaption, small { color: #64748b !important; }
@@ -177,19 +177,19 @@ def _pro_layout(fig, title=None, yaxis_title="Rate (%)", height=460, show_legend
         height=height,
         margin=dict(l=55, r=25, t=50 if title else 30, b=40),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(17,24,39,0.6)",
+        plot_bgcolor="rgba(22,26,38,0.7)",
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="#1e293b", font_color="#e2e8f0", font_size=12, bordercolor="#334155"),
+        hoverlabel=dict(bgcolor="#222836", font_color="#e2e8f0", font_size=12, bordercolor="#333a4a"),
         xaxis=dict(
-            gridcolor="#1e293b", gridwidth=1,
+            gridcolor="#222836", gridwidth=1,
             color="#94a3b8", tickfont=dict(size=10),
-            zeroline=False, showline=True, linecolor="#1e3a5f", linewidth=1,
+            zeroline=False, showline=True, linecolor="#2a3040", linewidth=1,
         ),
         yaxis=dict(
             title=dict(text=yaxis_title, font=dict(color="#94a3b8", size=12)),
-            gridcolor="#1e293b", gridwidth=1,
+            gridcolor="#222836", gridwidth=1,
             color="#94a3b8", tickfont=dict(size=10),
-            zeroline=False, showline=True, linecolor="#1e3a5f", linewidth=1,
+            zeroline=False, showline=True, linecolor="#2a3040", linewidth=1,
         ),
         font=dict(color="#94a3b8", family="Inter, sans-serif"),
     )
@@ -953,11 +953,11 @@ def page_charts():
 
             fig.update_layout(
                 hovermode='x unified', xaxis_title="", height=460,
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(17,24,39,0.6)",
-                hoverlabel=dict(bgcolor="#1e293b", font_color="#e2e8f0", font_size=12, bordercolor="#334155"),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(22,26,38,0.7)",
+                hoverlabel=dict(bgcolor="#222836", font_color="#e2e8f0", font_size=12, bordercolor="#333a4a"),
                 legend=dict(orientation="h", y=1.06, font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)"),
-                xaxis=dict(gridcolor="#1e293b", color="#94a3b8", showline=True, linecolor="#1e3a5f"),
-                yaxis=dict(gridcolor="#1e293b", color="#94a3b8", showline=True, linecolor="#1e3a5f"),
+                xaxis=dict(gridcolor="#222836", color="#94a3b8", showline=True, linecolor="#2a3040"),
+                yaxis=dict(gridcolor="#222836", color="#94a3b8", showline=True, linecolor="#2a3040"),
                 font=dict(color="#94a3b8", family="Inter, sans-serif"),
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -1313,16 +1313,38 @@ def _tenor_to_years(t: str) -> float:
     if t.endswith("Y"): return float(t[:-1])
     return float(t)
 
-@st.cache_data(ttl=300, show_spinner="Loading latest curve…")
-def _get_par_curve(currency: str, floating_rate: str):
-    """Get latest par rates as sorted (years, rates) arrays."""
-    query = """
-        SELECT DISTINCT ON (tenor) tenor, rate
-        FROM swap_rates
-        WHERE currency = %s AND floating_rate = %s
-        ORDER BY tenor, date DESC
-    """
-    df = run_query(query, [currency, floating_rate])
+@st.cache_data(ttl=300, show_spinner="Loading curve…")
+def _get_par_curve(currency: str, floating_rate: str, as_of_date: str = None):
+    """Get par rates as sorted (years, rates) arrays. If as_of_date given, use that date's curve."""
+    if as_of_date:
+        query = """
+            SELECT tenor, rate
+            FROM swap_rates
+            WHERE currency = %s AND floating_rate = %s AND date = %s
+            ORDER BY tenor
+        """
+        df = run_query(query, [currency, floating_rate, as_of_date])
+        # If no data on exact date, try previous business day
+        if df.empty:
+            query2 = """
+                SELECT DISTINCT ON (tenor) tenor, rate
+                FROM swap_rates
+                WHERE currency = %s AND floating_rate = %s AND date <= %s
+                ORDER BY tenor, date DESC
+            """
+            df = run_query(query2, [currency, floating_rate, as_of_date])
+        dt = as_of_date
+    else:
+        query = """
+            SELECT DISTINCT ON (tenor) tenor, rate
+            FROM swap_rates
+            WHERE currency = %s AND floating_rate = %s
+            ORDER BY tenor, date DESC
+        """
+        df = run_query(query, [currency, floating_rate])
+        dq = run_query("SELECT MAX(date) as d FROM swap_rates WHERE currency = %s AND floating_rate = %s", [currency, floating_rate])
+        dt = str(dq.iloc[0]["d"]) if not dq.empty else "?"
+    
     if df.empty:
         return None, None, None
     pairs = []
@@ -1337,9 +1359,6 @@ def _get_par_curve(currency: str, floating_rate: str):
     pairs.sort()
     xs = np.array([p[0] for p in pairs])
     ys = np.array([p[1] for p in pairs])
-    # latest date
-    dq = run_query("SELECT MAX(date) as d FROM swap_rates WHERE currency = %s AND floating_rate = %s", [currency, floating_rate])
-    dt = str(dq.iloc[0]["d"]) if not dq.empty else "?"
     return xs, ys, dt
 
 def _compute_fwd_matrix(par_x, par_y, expiries_y, tenors_y):
@@ -1367,7 +1386,16 @@ def page_fwd_matrices():
     TENOR_LABELS  = ["1Y","2Y","3Y","4Y","5Y","7Y","10Y","12Y","15Y","20Y","25Y","30Y"]
     TENOR_YEARS   = [_tenor_to_years(t) for t in TENOR_LABELS]
 
-    ccy = st.selectbox("Currency", ["AUD", "USD", "NZD"], key="fm_ccy")
+    col_ccy, col_date = st.columns([1, 1])
+    with col_ccy:
+        ccy = st.selectbox("Currency", ["AUD", "USD", "NZD"], key="fm_ccy")
+    with col_date:
+        use_hist = st.checkbox("Historical date", False, key="fm_hist")
+        if use_hist:
+            hist_date = st.date_input("As of date", value=datetime.now().date(), key="fm_date")
+            _as_of = str(hist_date)
+        else:
+            _as_of = None
 
     def _render_heatmap(matrix, title, exp_labels, tenor_labels, fmt=".2f", unit="%", colorscale="RdYlGn_r"):
         """Render a forward matrix as heatmap + optional 3D surface + data table."""
@@ -1390,16 +1418,19 @@ def page_fwd_matrices():
                 title=dict(text=title, font=dict(color="#e2e8f0", size=16, family="Inter, sans-serif"), x=0.01),
                 height=max(500, len(exp_labels) * 26),
                 margin=dict(l=60, r=20, t=50, b=40),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(17,24,39,0.6)",
-                xaxis=dict(title="Tenor", color="#94a3b8", side="top", showline=True, linecolor="#1e3a5f"),
-                yaxis=dict(title="Expiry", color="#94a3b8", autorange="reversed", showline=True, linecolor="#1e3a5f"),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(22,26,38,0.7)",
+                xaxis=dict(title="Tenor", color="#94a3b8", side="top", showline=True, linecolor="#2a3040"),
+                yaxis=dict(title="Expiry", color="#94a3b8", autorange="reversed", showline=True, linecolor="#2a3040"),
                 font=dict(color="#94a3b8", size=11, family="Inter, sans-serif"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
         elif view_mode == "3D Surface":
+            # Reverse tenor axis so short tenors near short expiries
+            z_rev = [row[::-1] for row in z]
+            tenor_rev = tenor_labels[::-1]
             fig = go.Figure(data=go.Surface(
-                z=z, x=tenor_labels, y=exp_labels,
+                z=z_rev, x=tenor_rev, y=exp_labels,
                 colorscale=colorscale, showscale=True,
                 colorbar=dict(title=dict(text=unit, font=dict(color="#94a3b8")), tickfont=dict(color="#94a3b8")),
                 contours=dict(
@@ -1412,10 +1443,10 @@ def page_fwd_matrices():
                 margin=dict(l=10, r=10, t=50, b=10),
                 paper_bgcolor="rgba(0,0,0,0)",
                 scene=dict(
-                    xaxis=dict(title="Tenor", color="#94a3b8", gridcolor="#1e293b", backgroundcolor="rgba(17,24,39,0.6)"),
-                    yaxis=dict(title="Expiry", color="#94a3b8", gridcolor="#1e293b", backgroundcolor="rgba(17,24,39,0.6)"),
-                    zaxis=dict(title=unit, color="#94a3b8", gridcolor="#1e293b", backgroundcolor="rgba(17,24,39,0.6)"),
-                    camera=dict(eye=dict(x=1.8, y=-1.8, z=1.2)),
+                    xaxis=dict(title="Tenor", color="#94a3b8", gridcolor="#333a4a", backgroundcolor="rgba(22,26,38,0.7)"),
+                    yaxis=dict(title="Expiry", color="#94a3b8", gridcolor="#333a4a", backgroundcolor="rgba(22,26,38,0.7)", autorange="reversed"),
+                    zaxis=dict(title=unit, color="#94a3b8", gridcolor="#333a4a", backgroundcolor="rgba(22,26,38,0.7)"),
+                    camera=dict(eye=dict(x=2.0, y=-1.5, z=1.0)),
                 ),
                 font=dict(color="#94a3b8", family="Inter, sans-serif"),
             )
@@ -1428,9 +1459,9 @@ def page_fwd_matrices():
     if ccy == "AUD":
         st.markdown("---")
         # Load all three AUD curves
-        qq_x, qq_y, qq_dt = _get_par_curve("AUD", "3M BBSW")
-        ss_x, ss_y, ss_dt = _get_par_curve("AUD", "6M BBSW")
-        ois_x, ois_y, ois_dt = _get_par_curve("AUD", "AONIA")
+        qq_x, qq_y, qq_dt = _get_par_curve("AUD", "3M BBSW", _as_of)
+        ss_x, ss_y, ss_dt = _get_par_curve("AUD", "6M BBSW", _as_of)
+        ois_x, ois_y, ois_dt = _get_par_curve("AUD", "AONIA", _as_of)
 
         if ss_x is None:
             st.error("No 6M BBSW data found.")
@@ -1492,8 +1523,8 @@ def page_fwd_matrices():
 
     elif ccy == "USD":
         st.markdown("---")
-        sofr_x, sofr_y, sofr_dt = _get_par_curve("USD", "SOFR")
-        ff_x, ff_y, ff_dt = _get_par_curve("USD", "FEDFUNDS")
+        sofr_x, sofr_y, sofr_dt = _get_par_curve("USD", "SOFR", _as_of)
+        ff_x, ff_y, ff_dt = _get_par_curve("USD", "FEDFUNDS", _as_of)
 
         if sofr_x is None:
             st.error("No USD SOFR data found.")
@@ -1526,8 +1557,8 @@ def page_fwd_matrices():
 
     elif ccy == "NZD":
         st.markdown("---")
-        nzd_x, nzd_y, nzd_dt = _get_par_curve("NZD", "BKBM 3M")
-        nzd_ois_x, nzd_ois_y, nzd_ois_dt = _get_par_curve("NZD", "NZONIA")
+        nzd_x, nzd_y, nzd_dt = _get_par_curve("NZD", "BKBM 3M", _as_of)
+        nzd_ois_x, nzd_ois_y, nzd_ois_dt = _get_par_curve("NZD", "NZONIA", _as_of)
 
         if nzd_x is None:
             st.error("No NZD BKBM 3M data found.")
@@ -1668,16 +1699,16 @@ def page_historicals():
     def _fig_layout(fig, cut, ylab):
         fig.update_layout(
             height=460, margin=dict(l=55, r=25, t=40, b=40),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(17,24,39,0.6)",
-            hoverlabel=dict(bgcolor="#1e293b", font_color="#e2e8f0", font_size=12, bordercolor="#334155"),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(22,26,38,0.7)",
+            hoverlabel=dict(bgcolor="#222836", font_color="#e2e8f0", font_size=12, bordercolor="#333a4a"),
             legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center",
                         font=dict(color="#94a3b8", size=11), bgcolor="rgba(0,0,0,0)"),
             yaxis_title=ylab,
-            xaxis=dict(gridcolor="#1e293b", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
-                       showline=True, linecolor="#1e3a5f", linewidth=1,
+            xaxis=dict(gridcolor="#222836", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
+                       showline=True, linecolor="#2a3040", linewidth=1,
                        range=[cut, pd.Timestamp.now()]),
-            yaxis=dict(gridcolor="#1e293b", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
-                       showline=True, linecolor="#1e3a5f", linewidth=1),
+            yaxis=dict(gridcolor="#222836", gridwidth=1, color="#94a3b8", tickfont=dict(size=10),
+                       showline=True, linecolor="#2a3040", linewidth=1),
             font=dict(color="#94a3b8", family="Inter, sans-serif"),
         )
 
@@ -2176,7 +2207,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.2</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v2.3</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
