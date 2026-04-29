@@ -126,23 +126,17 @@ st.markdown("""
         color: white !important;
         font-weight: 600;
     }
-    .stForm button[kind="primaryFormSubmit"] *,
-    .stForm [data-testid="stFormSubmitButton"] button *,
-    button[kind="primaryFormSubmit"] *,
-    .stForm button p,
-    .stForm button span,
-    [data-testid="stFormSubmitButton"] p,
-    [data-testid="stFormSubmitButton"] span {
-        color: white !important;
+    .stButton > button[kind="secondary"],
+    .stButton > button:not([kind="primary"]):not([kind="primaryFormSubmit"]) {
+        background: #d5e8f0 !important;
+        border: 1px solid #a8c8d8 !important;
+        color: #1a3f7a !important;
+        font-weight: 500;
     }
-    .stButton > button[kind="secondary"] {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        color: #5a6577 !important;
-    }
-    .stButton > button[kind="secondary"]:hover {
-        background: #f3f4f6 !important;
-        color: #1a1f2e !important;
+    .stButton > button[kind="secondary"]:hover,
+    .stButton > button:not([kind="primary"]):not([kind="primaryFormSubmit"]):hover {
+        background: #bdd8e8 !important;
+        color: #0f1729 !important;
     }
     
     /* ── Inputs ── */
@@ -197,31 +191,6 @@ st.markdown("""
     }
     [data-baseweb="tag"] span { color: white !important; }
     [data-baseweb="tag"] svg { fill: white !important; }
-    [data-baseweb="tag"] div { color: white !important; }
-    [data-baseweb="tag"] * { color: white !important; }
-    
-    /* ── Buttons — white text on navy ── */
-    .stButton > button,
-    button[kind="primary"],
-    button[kind="secondary"],
-    .stDownloadButton > button,
-    [data-testid="stBaseButton-primary"],
-    [data-testid="stBaseButton-secondary"] {
-        color: white !important;
-        background-color: #1a3f7a !important;
-        border-color: #1a3f7a !important;
-    }
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
-        color: white !important;
-        background-color: #15305d !important;
-    }
-    .stButton > button p,
-    .stDownloadButton > button p,
-    [data-testid="stBaseButton-primary"] p,
-    [data-testid="stBaseButton-secondary"] p {
-        color: white !important;
-    }
     
     /* ── Hide toolbar, deploy button, Fork, GitHub ── */
     [data-testid="stToolbar"] { display: none !important; }
@@ -542,8 +511,8 @@ def render_curve(currency: str, as_of_date=None):
     
     floating_rates = df['floating_rate'].unique()
     
-    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M',
-                   '1Y', '18M', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
+                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     df_filtered = df[df['tenor'].str.upper().isin([t.upper() for t in tenor_order])].copy()
@@ -663,8 +632,8 @@ def page_swap_rates():
     st.subheader("Latest Rates by Tenor")
     
     # Tenor ordering
-    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M',
-                   '1Y', '18M', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
+                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     def sort_and_filter_pivot(df):
@@ -831,7 +800,7 @@ def page_basis_swaps():
     st.info(f"Showing {len(df):,} records from last {days} days")
     
     # Tenor order for sorting
-    tenor_order = ['3M', '6M', '9M', '1Y', '18M', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
+    tenor_order = ['3M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
     
     # Parse basis type and tenor from rate_type
     def parse_basis(rate_type):
@@ -1386,6 +1355,47 @@ def _get_par_curve(currency: str, floating_rate: str, as_of_date: str = None):
 def _compute_fwd_matrix(par_x, par_y, expiries_y, tenors_y):
     """Compute forward matrix from par curve using fwd = (par(t2)*t2 - par(t1)*t1) / tenor.
     par_x/par_y: sorted arrays of maturities(years) and par rates(%)."""
+
+@st.cache_data(ttl=300, show_spinner="Loading basis curve…")
+def _get_basis_curve(currency: str, basis_type: str, as_of_date=None):
+    """Get basis curve from benchmark_rates as sorted (years, bps) arrays.
+    basis_type: '6v3' or '3v1'. Matches rate_type LIKE 'BASIS_{type}_%'."""
+    prefix = f"BASIS_{basis_type}_"
+    if as_of_date:
+        query = """
+            SELECT rate_type, rate FROM benchmark_rates
+            WHERE currency = %s AND rate_type LIKE %s AND date = %s
+            ORDER BY rate_type
+        """
+        df = run_query(query, [currency, prefix + '%', as_of_date])
+        if df.empty:
+            query2 = """
+                SELECT DISTINCT ON (rate_type) rate_type, rate FROM benchmark_rates
+                WHERE currency = %s AND rate_type LIKE %s AND date <= %s
+                ORDER BY rate_type, date DESC
+            """
+            df = run_query(query2, [currency, prefix + '%', as_of_date])
+    else:
+        query = """
+            SELECT DISTINCT ON (rate_type) rate_type, rate FROM benchmark_rates
+            WHERE currency = %s AND rate_type LIKE %s
+            ORDER BY rate_type, date DESC
+        """
+        df = run_query(query, [currency, prefix + '%'])
+    if df.empty:
+        return None, None
+    pairs = []
+    for _, row in df.iterrows():
+        tenor_str = row["rate_type"].replace(prefix, "")
+        try:
+            y = _tenor_to_years(tenor_str)
+            pairs.append((y, float(row["rate"])))
+        except:
+            pass
+    if not pairs:
+        return None, None
+    pairs.sort()
+    return np.array([p[0] for p in pairs]), np.array([p[1] for p in pairs])
     matrix = []
     for exp in expiries_y:
         row = []
@@ -1410,7 +1420,7 @@ def page_fwd_matrices():
 
     col_ccy, col_date = st.columns([1, 1])
     with col_ccy:
-        ccy = st.selectbox("Currency", ["AUD", "USD", "NZD"], key="fm_ccy")
+        ccy = st.selectbox("Currency", ["AUD", "USD", "EUR", "NZD"], key="fm_ccy")
     with col_date:
         use_hist = st.checkbox("Historical date", False, key="fm_hist")
         if use_hist:
@@ -1532,23 +1542,35 @@ def page_fwd_matrices():
                 _render_heatmap(matrix, "AUD Forward Matrix — OIS (AONIA)", EXPIRY_LABELS, TENOR_LABELS)
 
         elif _fm_tab == "6v3 Basis":
-            if qq_x is None:
-                st.error("No 3M BBSW data found.")
+            b_x, b_y = _get_basis_curve("AUD", "6v3", _as_of)
+            if b_x is None:
+                st.error("No 6v3 basis data found.")
             else:
-                m_ss = _compute_fwd_matrix(ss_x, ss_y, EXPIRY_YEARS, TENOR_YEARS)
-                m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
-                basis = [[(s - q) * 100 for s, q in zip(sr, qr)] for sr, qr in zip(m_ss, m_qq)]
-                _render_heatmap(basis, "AUD 6v3 Forward Basis (bp) — Semi (6M) fwd − Quarterly (3M) fwd",
+                basis = []
+                for exp in EXPIRY_YEARS:
+                    row = []
+                    for tenor in TENOR_YEARS:
+                        mid = exp + tenor / 2
+                        bp = float(np.interp(mid, b_x, b_y))
+                        row.append(round(bp, 1))
+                    basis.append(row)
+                _render_heatmap(basis, "AUD 6v3 Forward Basis (bp)",
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
 
         elif _fm_tab == "3v1 Basis":
-            if qq_x is None or bbsw1m_x is None:
-                st.error("Need both 3M BBSW and 1M BBSW data.")
+            b_x, b_y = _get_basis_curve("AUD", "3v1", _as_of)
+            if b_x is None:
+                st.error("No 3v1 basis data found.")
             else:
-                m_qq = _compute_fwd_matrix(qq_x, qq_y, EXPIRY_YEARS, TENOR_YEARS)
-                m_1m = _compute_fwd_matrix(bbsw1m_x, bbsw1m_y, EXPIRY_YEARS, TENOR_YEARS)
-                basis = [[(q - m) * 100 for q, m in zip(qr, mrow)] for qr, mrow in zip(m_qq, m_1m)]
-                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp) — Quarterly (3M BBSW) fwd − Monthly (1M BBSW) fwd",
+                basis = []
+                for exp in EXPIRY_YEARS:
+                    row = []
+                    for tenor in TENOR_YEARS:
+                        mid = exp + tenor / 2
+                        bp = float(np.interp(mid, b_x, b_y))
+                        row.append(round(bp, 1))
+                    basis.append(row)
+                _render_heatmap(basis, "AUD 3v1 Forward Basis (bp)",
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
 
     elif ccy == "USD":
@@ -1584,6 +1606,37 @@ def page_fwd_matrices():
                 basis = [[(s - f) * 100 for s, f in zip(sr, fr)] for sr, fr in zip(m_sofr, m_ff)]
                 _render_heatmap(basis, "USD SOFR-FF Forward Basis (bp)",
                                EXPIRY_LABELS, TENOR_LABELS, fmt=".1f", unit="bp", colorscale="RdYlBu_r")
+
+    elif ccy == "EUR":
+        st.markdown("---")
+        eur3_x, eur3_y, eur3_dt = _get_par_curve("EUR", "EURIBOR_3M", _as_of)
+        eur6_x, eur6_y, eur6_dt = _get_par_curve("EUR", "EURIBOR_6M", _as_of)
+        eur12_x, eur12_y, eur12_dt = _get_par_curve("EUR", "EURIBOR_12M", _as_of)
+        estr_x, estr_y, estr_dt = _get_par_curve("EUR", "ESTR", _as_of)
+
+        _eur_curves = []
+        if eur3_x is not None: _eur_curves.append("EURIBOR 3M")
+        if eur6_x is not None: _eur_curves.append("EURIBOR 6M")
+        if eur12_x is not None: _eur_curves.append("EURIBOR 12M")
+        if estr_x is not None: _eur_curves.append("ESTR")
+
+        if not _eur_curves:
+            st.error("No EUR data found.")
+            return
+
+        st.caption(f"Curve date: {eur6_dt or eur3_dt or estr_dt}")
+        _fm_tab = st.radio("Matrix", _eur_curves, horizontal=True, key="fm_eur_tab")
+
+        _eur_map = {
+            "EURIBOR 3M": (eur3_x, eur3_y),
+            "EURIBOR 6M": (eur6_x, eur6_y),
+            "EURIBOR 12M": (eur12_x, eur12_y),
+            "ESTR": (estr_x, estr_y),
+        }
+        _ex, _ey = _eur_map.get(_fm_tab, (None, None))
+        if _ex is not None:
+            matrix = _compute_fwd_matrix(_ex, _ey, EXPIRY_YEARS, TENOR_YEARS)
+            _render_heatmap(matrix, f"EUR Forward Matrix — {_fm_tab}", EXPIRY_LABELS, TENOR_LABELS)
 
     elif ccy == "NZD":
         st.markdown("---")
@@ -1644,7 +1697,7 @@ def page_historicals():
     # ── Currency selector ──
     col_ccy, col_load, col_info = st.columns([1, 1, 2])
     with col_ccy:
-        ccy = st.selectbox("Currency", ["AUD", "USD", "NZD"], key="hist_ccy")
+        ccy = st.selectbox("Currency", ["AUD", "USD", "EUR", "NZD"], key="hist_ccy")
 
     # ── Define floating rates per currency ──
     if ccy == "AUD":
@@ -1653,6 +1706,9 @@ def page_historicals():
     elif ccy == "USD":
         fr_a, fr_b = "SOFR", "FEDFUNDS"
         basis_label = "SOFR-FF"
+    elif ccy == "EUR":
+        fr_a, fr_b = "EURIBOR_6M", None
+        basis_label = None
     else:
         fr_a, fr_b = "BKBM 3M", None
         basis_label = None
@@ -1784,24 +1840,24 @@ def page_historicals():
         _conv_key = "Market"
 
     # ── Sub-tab navigation ──
+    _xccy_tabs = ["X-Ccy Forwards", "X-Ccy Spread"]
     if basis_label:
         _tab_names = ["IRS Spreads", "IRS Butterflies", "Fwd-Fwd Rates",
                       f"{basis_label} Outright", f"{basis_label} Fwd-Fwd",
-                      f"{basis_label} Spreads", f"{basis_label} Butterflies"]
+                      f"{basis_label} Spreads", f"{basis_label} Butterflies"] + _xccy_tabs
     else:
-        _tab_names = ["IRS Spreads", "IRS Butterflies", "Fwd-Fwd Rates"]
+        _tab_names = ["IRS Spreads", "IRS Butterflies", "Fwd-Fwd Rates"] + _xccy_tabs
 
     _active = st.session_state.get("_hist_active_tab", 0)
     if _active >= len(_tab_names):
         _active = 0
-    _cols = st.columns(len(_tab_names))
-    for _i, _name in enumerate(_tab_names):
-        with _cols[_i]:
-            if st.button(_name, key=f"_hist_tab_{_i}",
-                         type="primary" if _i == _active else "secondary",
-                         use_container_width=True):
-                st.session_state["_hist_active_tab"] = _i
-                st.rerun()
+    
+    # Row 1: single-currency tabs
+    _row1 = [n for n in _tab_names if n not in _xccy_tabs]
+    _sel1 = st.radio("Analysis", _row1 + _xccy_tabs, index=_active, 
+                     horizontal=True, key="_hist_tab_radio", label_visibility="collapsed")
+    _active = (_row1 + _xccy_tabs).index(_sel1) if _sel1 in (_row1 + _xccy_tabs) else 0
+    st.session_state["_hist_active_tab"] = _active
     st.markdown("---")
 
     # ════════════════════════════════════════════════════════════
@@ -2286,6 +2342,154 @@ def page_historicals():
             if _bf_series:
                 st.plotly_chart(_fig_bf, use_container_width=True)
                 _chart_stats(_bf_active, "bbf", "bp")
+
+    # ════════════════════════════════════════════════════════════
+    # X-CCY FORWARDS — Cross-Currency Forward Rate Comparison
+    # ════════════════════════════════════════════════════════════
+    _xccy_tab_idx = len(_tab_names) - 2  # X-Ccy Forwards
+    _xccy_spread_idx = len(_tab_names) - 1  # X-Ccy Spread
+
+    if _active == _xccy_tab_idx or _active == _xccy_spread_idx:
+        # ── Load all ccys if not already loaded ──
+        _xccy_config = {
+            "AUD": "3M BBSW",
+            "USD": "SOFR",
+            "EUR": "EURIBOR_6M",
+            "NZD": "BKBM 3M",
+        }
+        _xccy_colors = {"AUD": "#3b82f6", "USD": "#ef4444", "EUR": "#22c55e", "NZD": "#f59e0b"}
+
+        if "xccy_data" not in st.session_state:
+            st.session_state["xccy_data"] = {}
+
+        _need_load = any(c not in st.session_state["xccy_data"] for c in _xccy_config)
+        if _need_load:
+            with st.spinner("Loading cross-currency history..."):
+                for _xc, _xfr in _xccy_config.items():
+                    if _xc not in st.session_state["xccy_data"]:
+                        _xdf = load_swap_history(_xc, _xfr)
+                        if not _xdf.empty:
+                            st.session_state["xccy_data"][_xc] = _xdf
+
+        def _xccy_fwd_series(ccy_label, start_y, tenor_y, years_back=5):
+            """Compute historical forward rate for a given ccy/start/tenor."""
+            _xdf = st.session_state.get("xccy_data", {}).get(ccy_label, pd.DataFrame())
+            if _xdf.empty:
+                return None
+            s_col = f"{int(start_y)}Y" if start_y == int(start_y) else f"{start_y}Y"
+            e_col = f"{int(start_y + tenor_y)}Y"
+            if s_col not in _xdf.columns or e_col not in _xdf.columns:
+                return None
+            r_s = _xdf[s_col]
+            r_e = _xdf[e_col]
+            fwd = (r_e * (start_y + tenor_y) - r_s * start_y) / tenor_y
+            cut = pd.Timestamp.now() - pd.DateOffset(years=years_back)
+            return fwd[fwd.index >= cut].dropna()
+
+    if _active == _xccy_tab_idx:
+        st.markdown("#### Cross-Currency Forward Comparison")
+        st.caption("Compare forward rates across AUD, USD, EUR, NZD")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            _xfwd_start = st.selectbox("Forward Start", [1,2,3,5,7,10,15,20], index=3, key="xfwd_start",
+                                        format_func=lambda x: f"{x}Y")
+        with c2:
+            _xfwd_tenor = st.selectbox("Tenor", [1,2,3,5,7,10], index=3, key="xfwd_tenor",
+                                        format_func=lambda x: f"{x}Y")
+        with c3:
+            _xfwd_yr = st.slider("History (years)", 1, 8, 5, key="xfwd_yr")
+
+        _xfwd_label = f"{_xfwd_start}y{_xfwd_tenor}y"
+        _fig_xf = go.Figure()
+        _xf_series = {}
+
+        for _xc in ["AUD", "USD", "EUR", "NZD"]:
+            _ser = _xccy_fwd_series(_xc, _xfwd_start, _xfwd_tenor, _xfwd_yr)
+            if _ser is not None and not _ser.empty:
+                _xf_series[f"{_xc} {_xfwd_label}"] = _ser
+                _fig_xf.add_trace(go.Scatter(
+                    x=_ser.index, y=_ser.values, mode="lines",
+                    name=f"{_xc}", line=dict(color=_xccy_colors[_xc], width=1.8)))
+
+        if _xf_series:
+            _cut_xf = pd.Timestamp.now() - pd.DateOffset(years=_xfwd_yr)
+            _fig_layout(_fig_xf, _cut_xf, f"{_xfwd_label} Forward Rate (%)")
+            st.plotly_chart(_fig_xf, use_container_width=True)
+            _chart_stats(_xf_series, "xfwd", "%")
+
+            # ── Period change ranking table ──
+            st.markdown("##### Period Change Ranking")
+            _periods = {"1W": 5, "1M": 21, "3M": 63, "6M": 126, "1Y": 252}
+            _rank_rows = []
+            for _xc in ["AUD", "USD", "EUR", "NZD"]:
+                _ser = _xccy_fwd_series(_xc, _xfwd_start, _xfwd_tenor, 8)
+                if _ser is None or len(_ser) < 5:
+                    continue
+                _rr = {"Currency": _xc, "Current": round(_ser.iloc[-1], 3)}
+                for _pn, _pd in _periods.items():
+                    if len(_ser) > _pd:
+                        _chg = round((_ser.iloc[-1] - _ser.iloc[-_pd-1]) * 100, 1)
+                        _rr[f"{_pn} (bp)"] = _chg
+                    else:
+                        _rr[f"{_pn} (bp)"] = None
+                _rank_rows.append(_rr)
+            if _rank_rows:
+                _rdf = pd.DataFrame(_rank_rows).set_index("Currency")
+                st.dataframe(_rdf.style.format("{:.1f}", na_rep="—"),
+                             use_container_width=True, height=200)
+        else:
+            st.warning("No cross-currency data available. Data loads on first access.")
+
+    elif _active == _xccy_spread_idx:
+        st.markdown("#### Cross-Currency Forward Spread")
+        st.caption("Spread between two currencies' forward rates")
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1:
+            _xs_ccy_a = st.selectbox("Currency A", ["AUD", "USD", "EUR", "NZD"], index=0, key="xs_ccy_a")
+        with c2:
+            _xs_ccy_b = st.selectbox("Currency B", [c for c in ["AUD", "USD", "EUR", "NZD"] if c != _xs_ccy_a],
+                                      index=0, key="xs_ccy_b")
+        with c3:
+            _xs_start = st.selectbox("Start", [1,2,3,5,7,10,15,20], index=3, key="xs_start",
+                                      format_func=lambda x: f"{x}Y")
+        with c4:
+            _xs_tenor = st.selectbox("Tenor", [1,2,3,5,7,10], index=3, key="xs_tenor",
+                                      format_func=lambda x: f"{x}Y")
+        with c5:
+            _xs_yr = st.slider("History (years)", 1, 8, 5, key="xs_yr")
+
+        _xs_bands = st.checkbox("Mean ± 1σ bands", True, key="xs_bands")
+
+        _xs_label = f"{_xs_start}y{_xs_tenor}y"
+        _ser_a = _xccy_fwd_series(_xs_ccy_a, _xs_start, _xs_tenor, _xs_yr)
+        _ser_b = _xccy_fwd_series(_xs_ccy_b, _xs_start, _xs_tenor, _xs_yr)
+
+        if _ser_a is not None and _ser_b is not None:
+            _spread = ((_ser_a - _ser_b) * 100).dropna()  # in bp
+
+            _fig_xs = go.Figure()
+            _spread_label = f"{_xs_ccy_a} − {_xs_ccy_b} {_xs_label}"
+            _add_series(_fig_xs, _spread_label, _spread, _sp_colors[0], _xs_bands)
+            _fig_xs.add_hline(y=0, line=dict(color="#d1d5db", width=1))
+
+            _cut_xs = pd.Timestamp.now() - pd.DateOffset(years=_xs_yr)
+            _fig_layout(_fig_xs, _cut_xs, f"{_spread_label} (bp)")
+            st.plotly_chart(_fig_xs, use_container_width=True)
+            _chart_stats({_spread_label: _spread}, "xs", "bp")
+
+            # Show both legs
+            st.markdown("##### Individual Legs")
+            _fig_legs = go.Figure()
+            _fig_legs.add_trace(go.Scatter(x=_ser_a.index, y=_ser_a.values, mode="lines",
+                name=f"{_xs_ccy_a} {_xs_label}", line=dict(color=_xccy_colors[_xs_ccy_a], width=1.8)))
+            _fig_legs.add_trace(go.Scatter(x=_ser_b.index, y=_ser_b.values, mode="lines",
+                name=f"{_xs_ccy_b} {_xs_label}", line=dict(color=_xccy_colors[_xs_ccy_b], width=1.8)))
+            _fig_layout(_fig_legs, _cut_xs, f"Forward Rate (%)")
+            st.plotly_chart(_fig_legs, use_container_width=True)
+        else:
+            st.warning("Insufficient data for one or both currencies.")
 
 
 # ============================================================================
