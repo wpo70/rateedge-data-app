@@ -126,6 +126,15 @@ st.markdown("""
         color: white !important;
         font-weight: 600;
     }
+    .stForm button[kind="primaryFormSubmit"] *,
+    .stForm [data-testid="stFormSubmitButton"] button *,
+    button[kind="primaryFormSubmit"] *,
+    .stForm button p,
+    .stForm button span,
+    [data-testid="stFormSubmitButton"] p,
+    [data-testid="stFormSubmitButton"] span {
+        color: white !important;
+    }
     .stButton > button[kind="secondary"] {
         background: #ffffff !important;
         border: 1px solid #d1d5db !important;
