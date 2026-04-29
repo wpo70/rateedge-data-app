@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import psycopg2
 import requests
 import numpy as np
+import re
 
 # Page config - MUST BE FIRST
 st.set_page_config(
@@ -108,21 +109,35 @@ st.markdown("""
     /* ── Buttons — primary (data-testid selectors for modern Streamlit) ── */
     [data-testid="stBaseButton-primary"],
     [data-testid="stFormSubmitButton"] button,
+    [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"],
     .stButton > button[kind="primary"],
     button[kind="primaryFormSubmit"] {
         background: #1a3f7a !important;
+        background-color: #1a3f7a !important;
         border: none !important;
         color: white !important;
-        font-weight: 600;
+        font-weight: 600 !important;
         letter-spacing: 0.02em;
         box-shadow: 0 1px 4px rgba(26, 63, 122, 0.2);
     }
     [data-testid="stBaseButton-primary"]:hover,
     [data-testid="stFormSubmitButton"] button:hover,
+    [data-testid="stFormSubmitButton"] > button:hover,
     .stButton > button[kind="primary"]:hover {
         background: #234d94 !important;
+        background-color: #234d94 !important;
         color: white !important;
         box-shadow: 0 2px 8px rgba(26, 63, 122, 0.3);
+    }
+    /* Force white text on ALL primary-styled buttons (nuclear option) */
+    [data-testid="stFormSubmitButton"] button p,
+    [data-testid="stFormSubmitButton"] button span,
+    [data-testid="stFormSubmitButton"] button div,
+    [data-testid="stBaseButton-primary"] p,
+    [data-testid="stBaseButton-primary"] span,
+    [data-testid="stBaseButton-primary"] div {
+        color: white !important;
     }
     /* ── Buttons — secondary ── */
     [data-testid="stBaseButton-secondary"],
@@ -365,25 +380,36 @@ def get_db_url():
 
 @st.cache_resource
 def get_connection():
-    """Get database connection"""
+    """Get a fresh database connection"""
     try:
-        conn = psycopg2.connect(get_db_url())
+        conn = psycopg2.connect(get_db_url(), connect_timeout=10)
         return conn
     except Exception as e:
         st.error(f"Database connection failed: {e}")
         return None
 
 def run_query(query, params=None):
-    """Run a query and return results as DataFrame"""
-    conn = get_connection()
-    if not conn:
-        return pd.DataFrame()
-    try:
-        df = pd.read_sql(query, conn, params=params)
-        return df
-    except Exception as e:
-        st.error(f"Query failed: {e}")
-        return pd.DataFrame()
+    """Run a query and return results as DataFrame. Retries once on stale connection."""
+    for attempt in range(2):
+        conn = get_connection()
+        if not conn:
+            return pd.DataFrame()
+        try:
+            df = pd.read_sql(query, conn, params=params)
+            return df
+        except Exception as e:
+            err_msg = str(e).lower()
+            if attempt == 0 and ('ssl' in err_msg or 'closed' in err_msg or 'connection' in err_msg):
+                # Stale connection — retry with fresh one
+                continue
+            st.error(f"Query failed: {e}")
+            return pd.DataFrame()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return pd.DataFrame()
 
 # ============================================================================
 # DATA FETCHING
@@ -478,24 +504,36 @@ def get_available_currencies():
     return ["AUD", "NZD", "USD"]
 
 @st.cache_data(ttl=300)
-def get_rate_history(currency: str, tenor: str, floating_rate: str, days: int = 1825):
-    """Get historical rates for charting - default 5 years"""
-    query = """
-        SELECT date, rate
-        FROM swap_rates
-        WHERE currency = %s AND tenor = %s AND floating_rate = %s
-        AND date >= CURRENT_DATE - INTERVAL '%s days'
-        ORDER BY date
-    """
-    return run_query(query, [currency, tenor, floating_rate, days])
+def get_rate_history(currency: str, tenor: str, floating_rate: str, days: int = 1825,
+                     date_from=None, date_to=None):
+    """Get historical rates for charting. Use date_from/date_to for explicit range, else days."""
+    if date_from and date_to:
+        query = """
+            SELECT date, rate
+            FROM swap_rates
+            WHERE currency = %s AND tenor = %s AND floating_rate = %s
+            AND date >= %s AND date <= %s
+            ORDER BY date
+        """
+        return run_query(query, [currency, tenor, floating_rate, str(date_from), str(date_to)])
+    else:
+        query = """
+            SELECT date, rate
+            FROM swap_rates
+            WHERE currency = %s AND tenor = %s AND floating_rate = %s
+            AND date >= CURRENT_DATE - INTERVAL '%s days'
+            ORDER BY date
+        """
+        return run_query(query, [currency, tenor, floating_rate, days])
 
 # ============================================================================
 # UI COMPONENTS
 # ============================================================================
 
-def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 1825):
-    """Render historical rate chart - default 5 years"""
-    df = get_rate_history(currency, tenor, floating_rate, days)
+def render_rate_chart(currency: str, tenor: str, floating_rate: str, days: int = 1825,
+                      date_from=None, date_to=None):
+    """Render historical rate chart — supports period (days) or explicit date range."""
+    df = get_rate_history(currency, tenor, floating_rate, days, date_from, date_to)
     
     if df.empty:
         st.info("No historical data available")
@@ -647,12 +685,11 @@ def page_swap_rates():
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     def sort_and_filter_pivot(df):
-        """Sort pivot table by tenor order and filter out numeric tenors"""
-        # Filter to only valid string tenors
+        """Sort pivot table by tenor order (rows) and floating rate order (columns)"""
+        # ── Row sort: tenor order ──
         valid_tenors = [t for t in df.index if str(t).upper() in [x.upper() for x in tenor_order]]
         df_filtered = df.loc[valid_tenors].copy()
         
-        # Sort by tenor order
         def get_order(t):
             t_upper = str(t).upper()
             if t_upper in [x.upper() for x in tenor_order]:
@@ -664,6 +701,22 @@ def page_swap_rates():
         
         # Uppercase the index labels
         df_filtered.index = [str(t).upper() for t in df_filtered.index]
+        
+        # ── Column sort: floating rate by tenor size (OIS first, then 1M→12M) ──
+        def _fr_sort_key(fr):
+            """Sort floating rates: OIS/overnight first, then ascending tenor."""
+            fr_upper = str(fr).upper()
+            # OIS-type rates first
+            if fr_upper in ('AONIA', 'ESTR', 'SOFR', 'FEDFUNDS', 'NZONIA'):
+                return (0, fr_upper)
+            # Extract tenor number for EURIBOR/BBSW/BKBM
+            m = re.search(r'(\d+)M', fr_upper)
+            if m:
+                return (1, int(m.group(1)), fr_upper)
+            return (2, 0, fr_upper)
+        
+        sorted_cols = sorted(df_filtered.columns, key=_fr_sort_key)
+        df_filtered = df_filtered[sorted_cols]
         
         return df_filtered
     
@@ -881,6 +934,19 @@ def page_basis_swaps():
     with st.expander("📋 Raw Data"):
         st.dataframe(df, use_container_width=True, hide_index=True)
 
+def _sort_float_rates(fr_list):
+    """Sort floating rates: OIS/overnight first, then ascending tenor (1M→12M)."""
+    def _key(fr):
+        fr_u = str(fr).upper()
+        if fr_u in ('AONIA', 'ESTR', 'SOFR', 'FEDFUNDS', 'NZONIA'):
+            return (0, 0, fr_u)
+        m = re.search(r'(\d+)M', fr_u)
+        if m:
+            return (1, int(m.group(1)), fr_u)
+        return (2, 0, fr_u)
+    return sorted(fr_list, key=_key)
+
+
 def page_charts():
     """Historical charts page"""
     st.header("📉 Historical Charts")
@@ -900,7 +966,7 @@ def page_charts():
     chart_mode = st.radio("Mode", ["Single Currency", "Currency A vs B"], horizontal=True, key="chart_mode")
 
     if chart_mode == "Single Currency":
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             currency = st.selectbox("Currency", currencies, key="chart_ccy")
@@ -908,21 +974,30 @@ def page_charts():
         df = get_latest_rates(currency)
         raw_tenors = df['tenor'].unique().tolist() if not df.empty else []
         tenors = _sort_tenors(raw_tenors) or ['5Y']
-        floating_rates = sorted(df['floating_rate'].unique().tolist()) if not df.empty else ['3M BBSW']
+        floating_rates = _sort_float_rates(df['floating_rate'].unique().tolist()) if not df.empty else ['3M BBSW']
 
         with col2:
             tenor = st.selectbox("Tenor", tenors, key="chart_tenor")
         with col3:
             floating_rate = st.selectbox("Floating Rate", floating_rates, key="chart_float")
-        with col4:
+
+        # ── Date selection: Period OR Date Range ──
+        date_mode = st.radio("Date Selection", ["Period", "Date Range"], horizontal=True, key="chart_date_mode")
+        if date_mode == "Period":
             days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_days",
                                format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
-
-        render_rate_chart(currency, tenor, floating_rate, days)
+            render_rate_chart(currency, tenor, floating_rate, days)
+        else:
+            dc1, dc2 = st.columns(2)
+            with dc1:
+                d_from = st.date_input("From", value=datetime.now().date() - timedelta(days=365), key="chart_d_from")
+            with dc2:
+                d_to = st.date_input("To", value=datetime.now().date(), key="chart_d_to")
+            render_rate_chart(currency, tenor, floating_rate, date_from=d_from, date_to=d_to)
 
     else:
         # Currency A vs B comparison
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
         with col1:
             ccy_a = st.selectbox("Currency A", currencies, index=0, key="chart_ccy_a")
         with col2:
@@ -933,14 +1008,11 @@ def page_charts():
         tenors_a = _sort_tenors(df_a['tenor'].unique().tolist()) if not df_a.empty else []
         tenors_b = _sort_tenors(df_b['tenor'].unique().tolist()) if not df_b.empty else []
         common_tenors = [t for t in tenors_a if t in tenors_b] or ['5Y']
-        fr_a = sorted(df_a['floating_rate'].unique().tolist()) if not df_a.empty else ['3M BBSW']
-        fr_b = sorted(df_b['floating_rate'].unique().tolist()) if not df_b.empty else ['SOFR']
+        fr_a = _sort_float_rates(df_a['floating_rate'].unique().tolist()) if not df_a.empty else ['3M BBSW']
+        fr_b = _sort_float_rates(df_b['floating_rate'].unique().tolist()) if not df_b.empty else ['SOFR']
 
         with col3:
             tenor = st.selectbox("Tenor", common_tenors, key="chart_ab_tenor")
-        with col4:
-            days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_ab_days",
-                               format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
 
         col_fa, col_fb, col_spread = st.columns(3)
         with col_fa:
@@ -950,8 +1022,21 @@ def page_charts():
         with col_spread:
             show_spread = st.checkbox("Show spread (A − B)", False, key="chart_ab_spread")
 
-        hist_a = get_rate_history(ccy_a, tenor, float_a, days)
-        hist_b = get_rate_history(ccy_b, tenor, float_b, days)
+        # ── Date selection: Period OR Date Range ──
+        date_mode_ab = st.radio("Date Selection", ["Period", "Date Range"], horizontal=True, key="chart_ab_date_mode")
+        if date_mode_ab == "Period":
+            days = st.selectbox("Period", [30, 60, 90, 180, 365, 730, 1825], index=6, key="chart_ab_days",
+                               format_func=lambda x: f"{x} days" if x < 365 else f"{x//365}Y")
+            hist_a = get_rate_history(ccy_a, tenor, float_a, days)
+            hist_b = get_rate_history(ccy_b, tenor, float_b, days)
+        else:
+            dc1, dc2 = st.columns(2)
+            with dc1:
+                d_from_ab = st.date_input("From", value=datetime.now().date() - timedelta(days=365), key="chart_ab_d_from")
+            with dc2:
+                d_to_ab = st.date_input("To", value=datetime.now().date(), key="chart_ab_d_to")
+            hist_a = get_rate_history(ccy_a, tenor, float_a, date_from=d_from_ab, date_to=d_to_ab)
+            hist_b = get_rate_history(ccy_b, tenor, float_b, date_from=d_from_ab, date_to=d_to_ab)
 
         if hist_a.empty and hist_b.empty:
             st.info("No data for either currency.")
@@ -2534,7 +2619,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2e</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2f</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
