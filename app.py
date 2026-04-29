@@ -508,8 +508,8 @@ def render_curve(currency: str, as_of_date=None):
     
     floating_rates = df['floating_rate'].unique()
     
-    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
-                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M',
+                   '1Y', '18M', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     df_filtered = df[df['tenor'].str.upper().isin([t.upper() for t in tenor_order])].copy()
@@ -629,8 +629,8 @@ def page_swap_rates():
     st.subheader("Latest Rates by Tenor")
     
     # Tenor ordering
-    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
-                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M',
+                   '1Y', '18M', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     def sort_and_filter_pivot(df):
@@ -797,7 +797,7 @@ def page_basis_swaps():
     st.info(f"Showing {len(df):,} records from last {days} days")
     
     # Tenor order for sorting
-    tenor_order = ['3M', '6M', '9M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
+    tenor_order = ['3M', '6M', '9M', '1Y', '18M', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '12Y', '15Y', '20Y', '25Y', '30Y', '40Y', '50Y']
     
     # Parse basis type and tenor from rate_type
     def parse_basis(rate_type):
@@ -2286,7 +2286,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.0</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
