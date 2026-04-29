@@ -188,6 +188,31 @@ st.markdown("""
     }
     [data-baseweb="tag"] span { color: white !important; }
     [data-baseweb="tag"] svg { fill: white !important; }
+    [data-baseweb="tag"] div { color: white !important; }
+    [data-baseweb="tag"] * { color: white !important; }
+    
+    /* ── Buttons — white text on navy ── */
+    .stButton > button,
+    button[kind="primary"],
+    button[kind="secondary"],
+    .stDownloadButton > button,
+    [data-testid="stBaseButton-primary"],
+    [data-testid="stBaseButton-secondary"] {
+        color: white !important;
+        background-color: #1a3f7a !important;
+        border-color: #1a3f7a !important;
+    }
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
+        color: white !important;
+        background-color: #15305d !important;
+    }
+    .stButton > button p,
+    .stDownloadButton > button p,
+    [data-testid="stBaseButton-primary"] p,
+    [data-testid="stBaseButton-secondary"] p {
+        color: white !important;
+    }
     
     /* ── Hide toolbar, deploy button, Fork, GitHub ── */
     [data-testid="stToolbar"] { display: none !important; }
