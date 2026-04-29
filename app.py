@@ -105,8 +105,11 @@ st.markdown("""
     /* ── Dataframes ── */
     .stDataFrame { border: 1px solid #e2e5ea; border-radius: 8px; overflow: hidden; }
     
-    /* ── Buttons ── */
-    .stButton > button[kind="primary"] {
+    /* ── Buttons — primary (data-testid selectors for modern Streamlit) ── */
+    [data-testid="stBaseButton-primary"],
+    [data-testid="stFormSubmitButton"] button,
+    .stButton > button[kind="primary"],
+    button[kind="primaryFormSubmit"] {
         background: #1a3f7a !important;
         border: none !important;
         color: white !important;
@@ -114,18 +117,15 @@ st.markdown("""
         letter-spacing: 0.02em;
         box-shadow: 0 1px 4px rgba(26, 63, 122, 0.2);
     }
+    [data-testid="stBaseButton-primary"]:hover,
+    [data-testid="stFormSubmitButton"] button:hover,
     .stButton > button[kind="primary"]:hover {
         background: #234d94 !important;
+        color: white !important;
         box-shadow: 0 2px 8px rgba(26, 63, 122, 0.3);
     }
-    /* Form submit buttons */
-    .stForm button[kind="primaryFormSubmit"],
-    .stForm [data-testid="stFormSubmitButton"] button,
-    button[kind="primaryFormSubmit"] {
-        background: #1a3f7a !important;
-        color: white !important;
-        font-weight: 600;
-    }
+    /* ── Buttons — secondary ── */
+    [data-testid="stBaseButton-secondary"],
     .stButton > button[kind="secondary"],
     .stButton > button:not([kind="primary"]):not([kind="primaryFormSubmit"]) {
         background: #d5e8f0 !important;
@@ -133,6 +133,7 @@ st.markdown("""
         color: #1a3f7a !important;
         font-weight: 500;
     }
+    [data-testid="stBaseButton-secondary"]:hover,
     .stButton > button[kind="secondary"]:hover,
     .stButton > button:not([kind="primary"]):not([kind="primaryFormSubmit"]):hover {
         background: #bdd8e8 !important;
@@ -161,14 +162,17 @@ st.markdown("""
     }
     
     /* ── Download buttons ── */
+    [data-testid="stDownloadButton"] button,
     .stDownloadButton > button {
         background: #059669 !important;
         border: none !important;
         color: white !important;
         font-weight: 600;
     }
+    [data-testid="stDownloadButton"] button:hover,
     .stDownloadButton > button:hover {
         background: #047857 !important;
+        color: white !important;
     }
     
     /* ── Alerts ── */
@@ -246,9 +250,11 @@ def request_otp(email: str):
         resp = requests.post(
             f"{AUTH_URL}/request-otp", 
             json={"email": email, "site": SITE_ID}, 
-            timeout=10
+            timeout=30
         )
         return resp.status_code, resp.json()
+    except requests.exceptions.Timeout:
+        return 500, {"error": "Auth service is waking up — please try again in a moment"}
     except Exception as e:
         return 500, {"error": str(e)}
 
@@ -258,9 +264,11 @@ def verify_otp(email: str, code: str):
         resp = requests.post(
             f"{AUTH_URL}/verify-otp", 
             json={"email": email, "site": SITE_ID, "code": code}, 
-            timeout=10
+            timeout=30
         )
         return resp.status_code, resp.json()
+    except requests.exceptions.Timeout:
+        return 500, {"error": "Auth service is waking up — please try again in a moment"}
     except Exception as e:
         return 500, {"error": str(e)}
 
@@ -302,7 +310,8 @@ def render_login():
                 submitted = st.form_submit_button("📧 Send Verification Code", use_container_width=True, type="primary")
             if submitted:
                 if email and '@' in email:
-                    status, data = request_otp(email)
+                    with st.spinner("Contacting auth service..."):
+                        status, data = request_otp(email)
                     if status == 200:
                         st.session_state.auth_step = 'otp'
                         st.session_state.auth_email = email
@@ -323,7 +332,8 @@ def render_login():
                 submitted = st.form_submit_button("✅ Verify", use_container_width=True, type="primary")
             if submitted:
                 if code and len(code) == 6:
-                    status, data = verify_otp(email, code)
+                    with st.spinner("Verifying..."):
+                        status, data = verify_otp(email, code)
                     if status == 200:
                         st.session_state["authenticated"] = True
                         st.session_state["username"] = email
@@ -2524,7 +2534,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2e</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
