@@ -560,8 +560,8 @@ def render_curve(currency: str, as_of_date=None):
     
     floating_rates = df['floating_rate'].unique()
     
-    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
-                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M',
+                   '1Y', '18M', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     df_filtered = df[df['tenor'].str.upper().isin([t.upper() for t in tenor_order])].copy()
@@ -681,8 +681,8 @@ def page_swap_rates():
     st.subheader("Latest Rates by Tenor")
     
     # Tenor ordering
-    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M', '18M',
-                   '1Y', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
+    tenor_order = ['1W', '2W', '1M', '2M', '3M', '4M', '5M', '6M', '9M',
+                   '1Y', '18M', '2Y', '2.5Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y',
                    '12Y', '15Y', '20Y', '25Y', '30Y', '35Y', '40Y', '50Y', '60Y']
     
     def sort_and_filter_pivot(df):
@@ -955,8 +955,8 @@ def page_charts():
     # Proper tenor sorting
     def _sort_tenors(tenor_list):
         """Sort tenors properly: 1W, 1M, 2M, ..., 1Y, 2Y, ..., 50Y"""
-        ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
-                   '1Y','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
+        ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M',
+                   '1Y','18M','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
                    '12Y','15Y','20Y','25Y','30Y','35Y','40Y','50Y','60Y']
         valid = [t for t in ORDERED if t in tenor_list]
         return valid
@@ -1079,8 +1079,8 @@ def page_charts():
 # DOWNLOAD PAGE
 # ============================================================================
 
-VALID_TENORS_ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
-    '1Y','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
+VALID_TENORS_ORDERED = ['1W','2W','1M','2M','3M','4M','5M','6M','9M',
+    '1Y','18M','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
     '12Y','15Y','20Y','25Y','30Y','35Y','40Y','45Y','50Y','60Y']
 
 def page_download():
@@ -1396,8 +1396,8 @@ def _tenor_to_years(t: str) -> float:
     if t.endswith("Y"): return float(t[:-1])
     return float(t)
 
-_VALID_DB_TENORS = ('1W','2W','1M','2M','3M','4M','5M','6M','9M','18M',
-    '1Y','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
+_VALID_DB_TENORS = ('1W','2W','1M','2M','3M','4M','5M','6M','9M',
+    '1Y','18M','2Y','2.5Y','3Y','4Y','5Y','6Y','7Y','8Y','9Y','10Y',
     '12Y','15Y','20Y','25Y','30Y','35Y','40Y','45Y','50Y','60Y')
 
 @st.cache_data(ttl=300, show_spinner="Loading curve…")
@@ -2717,7 +2717,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2i</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2j</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
