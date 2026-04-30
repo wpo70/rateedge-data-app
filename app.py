@@ -1680,11 +1680,8 @@ def page_fwd_matrices():
 
     if ccy == "AUD":
         st.markdown("---")
-        # Load all three AUD curves
-        qq_x, qq_y, qq_dt = _get_par_curve("AUD", "3M BBSW", _as_of)
+        # Load SS curve first for gate check and caption
         ss_x, ss_y, ss_dt = _get_par_curve("AUD", "6M BBSW", _as_of)
-        ois_x, ois_y, ois_dt = _get_par_curve("AUD", "AONIA", _as_of)
-        bbsw1m_x, bbsw1m_y, bbsw1m_dt = _get_par_curve("AUD", "1M BBSW", _as_of)
 
         if ss_x is None:
             st.error("No 6M BBSW data found.")
@@ -1696,6 +1693,7 @@ def page_fwd_matrices():
                                        "6v3 Basis", "3v1 Basis"], horizontal=True, key="fm_aud_tab")
 
         if _fm_tab == "Market (Dual)":
+            qq_x, qq_y, _ = _get_par_curve("AUD", "3M BBSW", _as_of)
             # ≤3Y tenor → QQ @ quarterly, ≥4Y → SS @ semi-annual
             qq_zx, qq_zy = (None, None)
             if qq_x is not None:
@@ -1716,6 +1714,7 @@ def page_fwd_matrices():
                            EXPIRY_LABELS, TENOR_LABELS)
 
         elif _fm_tab == "Q/Q (3M BBSW)":
+            qq_x, qq_y, _ = _get_par_curve("AUD", "3M BBSW", _as_of)
             if qq_x is None:
                 st.error("No 3M BBSW data found.")
             else:
@@ -1727,6 +1726,7 @@ def page_fwd_matrices():
             _render_heatmap(matrix, "AUD Forward Matrix — S/S (6M BBSW)", EXPIRY_LABELS, TENOR_LABELS)
 
         elif _fm_tab == "OIS (AONIA)":
+            ois_x, ois_y, _ = _get_par_curve("AUD", "AONIA", _as_of)
             if ois_x is None:
                 st.error("No AONIA data found.")
             else:
@@ -2717,7 +2717,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2h</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2i</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
