@@ -373,12 +373,11 @@ def render_login():
 # ============================================================================
 
 def get_db_url():
-    """Get Supabase database URL from Streamlit secrets."""
+    """Get Supabase database URL"""
     try:
         return st.secrets["DATABASE_URL"]
-    except Exception:
-        st.error("DATABASE_URL not configured in Streamlit secrets.")
-        st.stop()
+    except:
+        return "postgresql://postgres.oxwbyotzdqccaajyaqhn:RateEdge2026!@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 def get_connection():
     """Get a fresh database connection — no caching, each query gets its own."""
@@ -2717,7 +2716,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2j</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2k</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
