@@ -618,6 +618,7 @@ def page_dashboard():
     
     cols = st.columns(len(currencies))
     
+    latest_dates = []
     for i, ccy in enumerate(currencies):
         with cols[i]:
             df = get_latest_rates(ccy)
@@ -628,8 +629,18 @@ def page_dashboard():
                     st.metric(f"{ccy} 5Y", f"{rate:.3f}%")
                 else:
                     st.metric(f"{ccy}", "No 5Y data")
+                if 'date' in df.columns:
+                    latest_dates.append(df['date'].max())
             else:
                 st.metric(f"{ccy}", "No data")
+    
+    if latest_dates:
+        latest = max(latest_dates)
+        if hasattr(latest, 'strftime'):
+            date_str = latest.strftime('%d %b %Y')
+        else:
+            date_str = str(latest)
+        st.caption(f"Latest curve data: {date_str}")
     
     st.markdown("---")
     
@@ -2716,7 +2727,7 @@ def main():
         
         st.markdown("---")
         st.markdown("""<div style="text-align:center; padding:0.5rem 0;">
-            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2k</div>
+            <div style="color:#64748b; font-size:0.7rem;">RateEdge Data Portal v3.2l</div>
             <div style="color:#475569; font-size:0.65rem; margin-top:2px;">© 2026 RateEdge (Aust.)</div>
         </div>""", unsafe_allow_html=True)
     
