@@ -5,6 +5,7 @@ Dark theme, email OTP auth with SSL fix
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -22,6 +23,46 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================================================
+# SUPPRESS PASSWORD-MANAGER AUTOFILL POPUPS (iCloud Passwords / 1Password / etc.)
+# Tags all inputs so extensions stop anchoring autofill prompts to the date picker.
+# Re-runs on an interval to catch Streamlit reruns.
+# ============================================================================
+components.html("""
+<script>
+(function () {
+  const doc = parent.document;
+  const tagInputs = () => {
+    try {
+      // Forms: stop Safari treating the step flow as a sign-in form
+      doc.querySelectorAll('form').forEach(f => f.setAttribute('autocomplete', 'off'));
+
+      doc.querySelectorAll('input, textarea').forEach(el => {
+        const hint = ((el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '')).toLowerCase();
+        const isOtp = el.getAttribute('maxlength') === '6' || hint.includes('digit') || hint.includes('code');
+
+        // iCloud Passwords / Safari IGNORE autocomplete="off" on fields it reads as credentials.
+        // Reclassifying the OTP box as one-time-code makes Safari stop offering saved passwords
+        // (and it won't autofill anything on a desktop email-OTP flow, so no popup at all).
+        el.setAttribute('autocomplete', isOtp ? 'one-time-code' : 'off');
+        if (isOtp) el.setAttribute('inputmode', 'numeric');
+
+        el.setAttribute('data-1p-ignore', '');     // 1Password
+        el.setAttribute('data-lpignore', 'true');  // LastPass
+        el.setAttribute('data-bwignore', '');      // Bitwarden
+        el.setAttribute('data-form-type', 'other');
+      });
+    } catch (e) {}
+  };
+
+  tagInputs();
+  // Tag inputs the instant Streamlit re-renders them, closing the gap where the popup used to flash in.
+  try { new MutationObserver(tagInputs).observe(doc.body, { childList: true, subtree: true }); } catch (e) {}
+  setInterval(tagInputs, 750);  // belt-and-suspenders backup
+})();
+</script>
+""", height=0)
 
 # ============================================================================
 # GLOBAL PROFESSIONAL THEME
